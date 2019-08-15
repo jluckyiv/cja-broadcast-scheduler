@@ -7,6 +7,7 @@
   "scripts": {
     "start": "parcel src/index.html",
     "build": "rm -r dist && parcel build src/index.html --public-url ./",
+    "deploy": "yarn run build && firebase deploy --only hosting",
     "test": "elm-test",
     "autotest": "elm-test --watch"
   },
