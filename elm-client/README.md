@@ -1,8 +1,10 @@
-# elm-client
+# CJA Twilio Notification Scheduler
 
-CJA Twilio notification scheduler
+This app uses Firebase Hosting to schedule Twilio jobs. Twilio setup is separate.
 
 ## Getting Started
+
+Get values for `.env` from Firebase. Instructions are [here](https://firebase.google.com/docs/web/setup?authuser=0#add-sdks-initialize).
 
 ### Install Dependencies
 
@@ -12,7 +14,7 @@ CJA Twilio notification scheduler
 
 `yarn start`
 
-Will compile your app and serve it from http://localhost:1234/ 
+Will compile your app and serve it from http://localhost:1234/
 Changes to your source code will trigger a hot-reload in the browser, which
 will also show compiler errors on build failures.
 
@@ -35,7 +37,7 @@ Will generate a production-ready build of your app in the `dist` folder.
 ### Elm Commands
 
 Elm binaries can be found in `node_modules/.bin`. They can be run from within
-your project via  `yarn run` 
+your project via `yarn run`
 
 To install new Elm packages, run:
 
