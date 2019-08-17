@@ -24,8 +24,6 @@ interface Workers {
 
 // Business logic for named tasks. Function name should match worker field on task document.
 const workers: Workers = {
-  helloWorld: () => db.collection("logs").add({ hello: "world" }),
-
   sendMessage: async ({ phoneNumber, body }) => {
     const message = await client.messages.create({
       to: phoneNumber,

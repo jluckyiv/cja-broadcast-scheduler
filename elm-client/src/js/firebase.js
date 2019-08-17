@@ -31,11 +31,6 @@ export const signOut = () => auth.signOut();
 
 export const tasks = firestore().collection('tasks');
 
-export const helloWorld = (dateString) => {
-  const worker = 'helloWorld';
-  return addTask(dateString, worker, {});
-};
-
 export const sendMessage = ({ dateString, phoneNumber, body }) => {
   const worker = 'sendMessage';
   return addTask(dateString, worker, { phoneNumber, body });
@@ -85,12 +80,10 @@ const addTask = (dateString, worker, options) => {
 
 export const scheduledTasksQuery = () => tasks.where('status', '==', 'scheduled').orderBy('performAt');
 
-export const completeTasksQuery = function () {
-  return tasks
-    .where('status', '==', 'complete')
-    .orderBy('performAt', 'desc')
-    .limit(25);
-};
+export const completeTasksQuery = () => tasks
+  .where('status', '==', 'complete')
+  .orderBy('performAt', 'desc')
+  .limit(25);
 
 export const getAdmins = () => firestore()
   .collection('admins')
