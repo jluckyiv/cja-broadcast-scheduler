@@ -83,9 +83,7 @@ init { status, dateString } =
       , completeTasks = NotAsked
       , admins = Loading
       }
-    , Cmd.batch
-        [ Cmd.map GotGenericData (Api.send Api.GetAdmins)
-        ]
+    , Cmd.map GotGenericData (Api.send Api.GetAdmins)
     )
 
 
@@ -136,7 +134,7 @@ update msg model =
             decodeGenericData model genericData
 
         GotSession session ->
-            updateSession session model
+            updateSession model session
 
         Login ->
             login model
@@ -148,13 +146,13 @@ update msg model =
             submitForm model
 
         UpdatedDate string ->
-            updateDate string model
+            updateDate model string
 
         UpdatedMessage string ->
-            updateBody string model
+            updateBody model string
 
         UpdatedTime string ->
-            updateTime string model
+            updateTime model string
 
 
 login : Model -> ( Model, Cmd Msg )
@@ -169,8 +167,8 @@ logout model =
     )
 
 
-updateSession : Session -> Model -> ( Model, Cmd Msg )
-updateSession session model =
+updateSession : Model -> Session -> ( Model, Cmd Msg )
+updateSession model session =
     ( { model | session = session }, focusMessageInput )
 
 
@@ -183,8 +181,8 @@ updateWorker ({ formData } as model) worker =
     ( { model | formData = newFormData }, Cmd.none )
 
 
-updateBody : String -> Model -> ( Model, Cmd Msg )
-updateBody string ({ formData } as model) =
+updateBody : Model -> String -> ( Model, Cmd Msg )
+updateBody ({ formData } as model) string =
     let
         newFormData =
             { formData | body = string }
@@ -192,8 +190,8 @@ updateBody string ({ formData } as model) =
     ( { model | formData = newFormData }, Cmd.none )
 
 
-updateDate : String -> Model -> ( Model, Cmd Msg )
-updateDate string ({ formData } as model) =
+updateDate : Model -> String -> ( Model, Cmd Msg )
+updateDate ({ formData } as model) string =
     let
         newFormData =
             { formData | date = string }
@@ -201,8 +199,8 @@ updateDate string ({ formData } as model) =
     ( { model | formData = newFormData }, Cmd.none )
 
 
-updateTime : String -> Model -> ( Model, Cmd Msg )
-updateTime string ({ formData } as model) =
+updateTime : Model -> String -> ( Model, Cmd Msg )
+updateTime ({ formData } as model) string =
     let
         newFormData =
             { formData | time = string }
