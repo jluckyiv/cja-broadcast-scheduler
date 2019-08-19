@@ -13,8 +13,8 @@ fromString string =
 
 
 toString : UserId -> String
-toString (UserId email) =
-    email
+toString (UserId id) =
+    id
 
 
 decoder : Decoder UserId

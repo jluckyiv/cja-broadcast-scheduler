@@ -68,30 +68,6 @@ suite =
                 json
                     |> Decode.decodeString ScheduledTask.optionsDecoder
                     |> Expect.equal (Ok result)
-        , test "scheduledNotification" <|
-            \_ ->
-                let
-                    json =
-                        """
-                        {
-                          "performAt": "7/28/2019 11:11 AM",
-                          "status": "scheduled",
-                          "worker": "sendNotification",
-                          "options": {
-                            "body": "Hello World"
-                          }
-                        }
-                        """
-
-                    result =
-                        ScheduledTask.Params "7/28/2019 11:11 AM"
-                            "scheduled"
-                            "sendNotification"
-                            (ScheduledTask.Notification (NotificationOptions "Hello World"))
-                in
-                json
-                    |> Decode.decodeString ScheduledTask.decoder
-                    |> Expect.equal (Ok result)
         , test "DateTime" <|
             \_ ->
                 "8/13/2019, 11:52:00 PM"

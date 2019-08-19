@@ -8,7 +8,7 @@ port module Api exposing
     , userChanges
     )
 
-import Json.Encode exposing (Value, null)
+import Json.Encode as Encode exposing (Value, null)
 import User exposing (User)
 
 
@@ -101,7 +101,7 @@ tagToValue tag =
             encodeMessagePayload payload
 
         DeleteTask id ->
-            Json.Encode.string id
+            Encode.string id
 
         _ ->
             null
@@ -116,9 +116,9 @@ userChanges toMsg =
 -- HELPERS
 
 
-encodeMessagePayload : Payload -> Json.Encode.Value
+encodeMessagePayload : Payload -> Value
 encodeMessagePayload payload =
-    Json.Encode.object
-        [ ( "body", Json.Encode.string <| payload.body )
-        , ( "dateString", Json.Encode.string <| payload.dateString )
+    Encode.object
+        [ ( "body", Encode.string <| payload.body )
+        , ( "dateString", Encode.string <| payload.dateString )
         ]

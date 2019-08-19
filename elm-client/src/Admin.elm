@@ -8,18 +8,18 @@ type Admin
     = Admin Email
 
 
+decoder : Decoder Admin
+decoder =
+    Decode.map Admin Email.decoder
+
+
 isAuthorized : Email -> List Admin -> Bool
-isAuthorized email_ admins =
+isAuthorized candidateEmail admins =
     admins
-        |> List.map (email >> Email.toString)
-        |> List.member (Email.toString email_)
+        |> List.map email
+        |> List.member candidateEmail
 
 
 email : Admin -> Email
 email (Admin email_) =
     email_
-
-
-decoder : Decoder Admin
-decoder =
-    Decode.map (Email.fromString >> Admin) Decode.string

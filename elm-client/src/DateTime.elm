@@ -1,9 +1,21 @@
-module DateTime exposing (DateTime, fromString, fromTuple, new, toDateString, toString, toTimeString)
+module DateTime exposing (DateTime, decoder, fromString, fromTuple, new, toDateString, toHtml, toString, toTimeString)
 
+import Html exposing (Html)
+import Json.Decode as Decode exposing (Decoder)
 
 
 type DateTime
     = DateTime String
+
+
+decoder : Decoder DateTime
+decoder =
+    Decode.map DateTime Decode.string
+
+
+toHtml : DateTime -> Html msg
+toHtml dateTime =
+    Html.text (toString dateTime)
 
 
 new : String -> Maybe DateTime

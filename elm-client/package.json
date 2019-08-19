@@ -9,7 +9,7 @@
     "build": "rm -r dist && parcel build src/index.html --public-url ./",
     "deploy": "yarn run build && firebase deploy --only hosting",
     "serve": "yarn run build && firebase serve --only hosting",
-    "start": "parcel index.html",
+    "start": "parcel src/index.html",
     "test": "elm-test"
   },
   "dependencies": {
