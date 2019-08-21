@@ -1,4 +1,4 @@
-module TaskId exposing
+module ScheduledTask.TaskId exposing
     ( TaskId
     , decoder
     , encode

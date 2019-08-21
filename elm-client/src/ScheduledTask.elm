@@ -15,10 +15,10 @@ import Html.Attributes exposing (class)
 import Html.Events exposing (onClick)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (required)
-import MessageOptions exposing (MessageOptions)
-import NotificationOptions exposing (NotificationOptions)
+import ScheduledTask.MessageOptions as MessageOptions exposing (MessageOptions)
+import ScheduledTask.NotificationOptions as NotificationOptions exposing (NotificationOptions)
+import ScheduledTask.TaskId as TaskId exposing (TaskId)
 import Status exposing (Status)
-import TaskId exposing (TaskId)
 import Worker exposing (Worker)
 
 

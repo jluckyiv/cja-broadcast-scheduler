@@ -22,7 +22,7 @@ import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
 import RemoteData exposing (RemoteData)
 import ScheduledTask exposing (ScheduledTask)
-import TaskId exposing (TaskId)
+import ScheduledTask.TaskId as TaskId exposing (TaskId)
 import User exposing (User)
 
 

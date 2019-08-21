@@ -1,4 +1,4 @@
-module NotificationOptions exposing (NotificationOptions, decoder, encode, toHtml)
+module ScheduledTask.NotificationOptions exposing (NotificationOptions, decoder, encode, toHtml)
 
 import Html exposing (Html, text)
 import Json.Decode as Decode exposing (Decoder)

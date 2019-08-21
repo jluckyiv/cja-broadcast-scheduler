@@ -12,9 +12,9 @@ import Html.Events exposing (onClick, onInput, onSubmit)
 import Json.Decode as Decode
 import RemoteData exposing (RemoteData(..))
 import ScheduledTask exposing (ScheduledTask)
+import ScheduledTask.TaskId exposing (TaskId)
 import Session exposing (Session)
 import Task
-import TaskId exposing (TaskId)
 import User exposing (User)
 
 

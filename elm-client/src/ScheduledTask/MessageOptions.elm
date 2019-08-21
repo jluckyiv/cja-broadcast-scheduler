@@ -1,4 +1,4 @@
-module MessageOptions exposing (MessageOptions, decoder, encode, toHtml)
+module ScheduledTask.MessageOptions exposing (MessageOptions, decoder, encode, toHtml)
 
 import Html exposing (Html, text)
 import Json.Decode as Decode exposing (Decoder)
