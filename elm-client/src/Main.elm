@@ -5,10 +5,10 @@ import Api exposing (RemoteList)
 import Browser
 import Browser.Dom as Dom
 import Bulma.Classes as Bu
-import FormData exposing (FormData)
-import Html exposing (Html, button, div, form, h3, input, label, nav, p, section, text)
-import Html.Attributes exposing (attribute, checked, class, id, name, placeholder, style, type_, value)
-import Html.Events exposing (onClick, onInput, onSubmit)
+import Form
+import Html exposing (Html, button, div, h3, nav, p, section, text)
+import Html.Attributes exposing (attribute, class, id)
+import Html.Events exposing (onClick)
 import Json.Decode as Decode
 import RemoteData exposing (RemoteData(..))
 import ScheduledTask exposing (ScheduledTask)
@@ -38,7 +38,7 @@ main =
 
 type alias Model =
     { session : Session
-    , formData : FormData
+    , formData : Form.Model
     , completeTasks : RemoteList ScheduledTask
     , scheduledTasks : RemoteList ScheduledTask
     , admins : RemoteList Admin
@@ -54,7 +54,7 @@ type alias Flags =
 init : Flags -> ( Model, Cmd Msg )
 init flags =
     ( { session = initSession flags
-      , formData = initForm flags
+      , formData = Form.init flags.localeString
       , scheduledTasks = NotAsked
       , completeTasks = NotAsked
       , admins = Loading
@@ -70,30 +70,22 @@ initSession { status, localeString } =
         |> Session.fromUser localeString
 
 
-initForm : Flags -> FormData
-initForm { localeString } =
-    FormData.init localeString
-
-
 
 -- UPDATE
 
 
 type Msg
     = ClickedDelete TaskId
-    | ClickedWorker FormData.Worker String
     | ConsoleError String
     | ConsoleInfo String
     | ConsoleLog String
     | Focus (Result Dom.Error ())
     | GotApiData Api.DataToElm
+    | GotFormMsg Form.Msg
     | GotSession Session
     | SignIn
     | SignOut
     | SubmittedForm
-    | UpdatedDate String
-    | UpdatedMessage String
-    | UpdatedTime String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -101,9 +93,6 @@ update msg model =
     case msg of
         ClickedDelete id ->
             deleteScheduledTaskById model id
-
-        ClickedWorker worker _ ->
-            updateWorker model worker
 
         ConsoleError error ->
             ( model, consoleError error )
@@ -125,6 +114,13 @@ update msg model =
         GotApiData data ->
             updateWithApiData model data
 
+        GotFormMsg formMsg ->
+            let
+                ( subModel, subMsg ) =
+                    Form.update formMsg model.formData
+            in
+            ( { model | formData = subModel }, Cmd.map GotFormMsg subMsg )
+
         GotSession session ->
             updateSession model session
 
@@ -136,15 +132,6 @@ update msg model =
 
         SubmittedForm ->
             submitForm model
-
-        UpdatedDate string ->
-            updateDate model string
-
-        UpdatedMessage string ->
-            updateBody model string
-
-        UpdatedTime string ->
-            updateTime model string
 
 
 updateWithApiData : Model -> Api.DataToElm -> ( Model, Cmd Msg )
@@ -255,61 +242,10 @@ inputForm : Model -> Html Msg
 inputForm model =
     case Session.user (toSession model) of
         User.SignedIn _ ->
-            loggedInForm model.formData
+            Html.map GotFormMsg (Form.view bodyInputId model.formData)
 
         _ ->
             p [] [ text "Only logged in users can input data." ]
-
-
-loggedInForm : FormData -> Html Msg
-loggedInForm formData =
-    form [ id "input-form", onSubmit SubmittedForm ]
-        [ workerMenu formData
-        , inputField bodyInputId "Message" formData.body "Your message here" UpdatedMessage
-        , inputField "time-input" "Time" formData.time "13:15 or 1:15 PM" UpdatedTime
-        , inputField "date-input" "Date" formData.date "01/01/2001" UpdatedDate
-        , button [ id "submit-button", class Bu.button, class Bu.isInfo ] [ text "Send" ]
-        ]
-
-
-inputField : String -> String -> String -> String -> (String -> Msg) -> Html Msg
-inputField id_ label_ value_ placeholder_ toMsg =
-    div [ class Bu.field ]
-        [ label [ class Bu.label ] [ text label_ ]
-        , div [ class Bu.control ]
-            [ input [ id id_, class Bu.input, type_ "text", placeholder placeholder_, value value_, onInput toMsg ]
-                []
-            ]
-        ]
-
-
-workerMenu : FormData -> Html Msg
-workerMenu formData =
-    div [ class Bu.field ]
-        [ div [ class Bu.control ]
-            [ radio "Send Board Broadcast"
-                (formData.worker == FormData.SendBoardNotification)
-                (ClickedWorker FormData.SendBoardNotification)
-            , radio "Send General Broadcast"
-                (formData.worker == FormData.SendGeneralNotification)
-                (ClickedWorker FormData.SendGeneralNotification)
-            , radio "Send Jack Message"
-                (formData.worker == FormData.SendJackMessage)
-                (ClickedWorker FormData.SendJackMessage)
-            , radio "Send Nicole Message"
-                (formData.worker == FormData.SendNicoleMessage)
-                (ClickedWorker FormData.SendNicoleMessage)
-            ]
-        ]
-
-
-radio : String -> Bool -> (String -> msg) -> Html msg
-radio value isChecked msg =
-    label
-        [ style "padding" "20px", class Bu.radio ]
-        [ input [ type_ "radio", name "worker-type", onInput msg, checked isChecked ] []
-        , text value
-        ]
 
 
 scheduledTaskSection : Model -> Html Msg
@@ -348,6 +284,23 @@ scheduledTaskList remoteData =
 
 
 -- HELPERS
+
+
+submitForm : Model -> ( Model, Cmd Msg )
+submitForm model =
+    let
+        ( subModel, subCmd ) =
+            Form.submit model.formData
+    in
+    ( { model | formData = subModel }
+    , Cmd.batch
+        [ subCmd
+        , focusMessageInput
+        ]
+    )
+
+
+
 -- UI
 
 
@@ -388,60 +341,6 @@ deleteScheduledTaskById : Model -> TaskId -> ( Model, Cmd Msg )
 deleteScheduledTaskById model id =
     ( model
     , Cmd.map ConsoleLog (Api.deleteTask id)
-    )
-
-
-
--- FORM
-
-
-updateWorker : Model -> FormData.Worker -> ( Model, Cmd Msg )
-updateWorker ({ formData } as model) worker =
-    let
-        newFormData =
-            { formData | worker = worker }
-    in
-    ( { model | formData = newFormData }, Cmd.none )
-
-
-updateBody : Model -> String -> ( Model, Cmd Msg )
-updateBody ({ formData } as model) string =
-    let
-        newFormData =
-            { formData | body = string }
-    in
-    ( { model | formData = newFormData }, Cmd.none )
-
-
-updateDate : Model -> String -> ( Model, Cmd Msg )
-updateDate ({ formData } as model) string =
-    let
-        newFormData =
-            { formData | date = string }
-    in
-    ( { model | formData = newFormData }, Cmd.none )
-
-
-updateTime : Model -> String -> ( Model, Cmd Msg )
-updateTime ({ formData } as model) string =
-    let
-        newFormData =
-            { formData | time = string }
-    in
-    ( { model | formData = newFormData }, Cmd.none )
-
-
-submitForm : Model -> ( Model, Cmd Msg )
-submitForm model =
-    let
-        ( subModel, subCmd ) =
-            FormData.submit model.formData
-    in
-    ( { model | formData = subModel }
-    , Cmd.batch
-        [ subCmd
-        , focusMessageInput
-        ]
     )
 
 
