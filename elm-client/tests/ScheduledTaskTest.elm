@@ -4,8 +4,8 @@ import DateTime
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
 import Json.Decode as Decode
-import MessageOptions exposing (MessageOptions)
-import NotificationOptions exposing (NotificationOptions)
+import ScheduledTask.MessageOptions as MessageOptions exposing (MessageOptions)
+import ScheduledTask.NotificationOptions as NotificationOptions exposing (NotificationOptions)
 import ScheduledTask exposing (ScheduledTask)
 import Test exposing (..)
 
