@@ -35,7 +35,7 @@ const formatPayload = (task, id) => ({
 // Elm app
 const flags = {
   status: getSignInResponseStatus(),
-  dateString: new Date().toLocaleString('en-US'),
+  localeString: new Date().toLocaleString('en-US'),
 };
 
 const app = Elm.Main.init({
@@ -44,6 +44,9 @@ const app = Elm.Main.init({
 });
 
 // Ports
+const ConsoleError = 'ConsoleError';
+const ConsoleInfo = 'ConsoleInfo';
+const ConsoleLog = 'ConsoleLog';
 const DeleteTask = 'DeleteTask';
 const GetAdmins = 'GetAdmins';
 const GetComplete = 'GetComplete';
@@ -51,38 +54,41 @@ const GetScheduled = 'GetScheduled';
 const GotAdmins = 'GotAdmins';
 const GotComplete = 'GotComplete';
 const GotScheduled = 'GotScheduled';
-const Login = 'Login';
-const Logout = 'Logout';
 const Pending = 'Pending';
-const SendJackMessage = 'SendJackMessage';
-const SendNicoleMessage = 'SendNicoleMessage';
 const SendBoardNotification = 'SendBoardNotification';
 const SendGeneralNotification = 'SendGeneralNotification';
+const SendJackMessage = 'SendJackMessage';
+const SendNicoleMessage = 'SendNicoleMessage';
+const SignIn = 'SignIn';
+const SignOut = 'SignOut';
 
 app.ports.dataFromElm.subscribe(({ tag, payload }) => {
+  console.log(tag, payload);
   switch (tag) {
+    case ConsoleError:
+      console.error(payload);
+    case ConsoleInfo:
+      console.info(payload);
+    case ConsoleLog:
+      console.log(payload);
+    case DeleteTask:
+      deleteTask(payload);
+      break;
     case GetAdmins:
       getAdmins()
         .then(data => dataToElm(GotAdmins, data.docs.map(doc => doc.id)))
         .catch(err => console.error(err));
       break;
-    case Login:
-      setSignInResponseStatus(Pending);
-      signIn();
-      break;
-    case Logout:
-      signOut();
-      break;
     case SendJackMessage:
       sendMessage({
-        dateString: payload.dateString,
+        localeString: payload.localeString,
         phoneNumber: JacksNumber,
         body: payload.body,
       });
       break;
     case SendNicoleMessage:
       sendMessage({
-        dateString: payload.dateString,
+        localeString: payload.localeString,
         phoneNumber: NicolesNumber,
         body: payload.body,
       });
@@ -90,19 +96,23 @@ app.ports.dataFromElm.subscribe(({ tag, payload }) => {
     case SendGeneralNotification:
       console.log('SendGeneralNotification:', payload);
       sendNotification({
-        dateString: payload.dateString,
+        localeString: payload.localeString,
         body: payload.body,
       });
       break;
     case SendBoardNotification:
       console.log('SendBoardNotification:', payload);
       sendBoardNotification({
-        dateString: payload.dateString,
+        localeString: payload.localeString,
         body: payload.body,
       });
       break;
-    case DeleteTask:
-      deleteTask(payload);
+    case SignIn:
+      setSignInResponseStatus(Pending);
+      signIn();
+      break;
+    case SignOut:
+      signOut();
       break;
     default:
       console.error(`Unrecognized tag: ${tag}, with payload:`, payload);

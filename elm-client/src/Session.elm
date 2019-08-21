@@ -1,6 +1,7 @@
-module Session exposing (Session, changes, dateString, fromUser, init, user)
+module Session exposing (Session, changes, dateString, email, fromUser, init, user)
 
 import Api
+import Email exposing (Email)
 import User exposing (User)
 
 
@@ -20,6 +21,13 @@ init string user_ =
 user : Session -> User
 user (Session _ user_) =
     user_
+
+
+email : Session -> Email
+email session =
+    session
+        |> user
+        |> User.email
 
 
 dateString : Session -> String

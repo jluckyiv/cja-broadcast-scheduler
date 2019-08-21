@@ -1,4 +1,13 @@
-module DateTime exposing (DateTime, decoder, fromString, fromTuple, new, toDateString, toHtml, toString, toTimeString)
+module DateTime exposing
+    ( DateTime
+    , decoder
+    , fromLocaleString
+    , fromTuple
+    , toDateString
+    , toHtml
+    , toLocaleString
+    , toTimeString
+    )
 
 import Html exposing (Html)
 import Json.Decode as Decode exposing (Decoder)
@@ -13,18 +22,8 @@ decoder =
     Decode.map DateTime Decode.string
 
 
-toHtml : DateTime -> Html msg
-toHtml dateTime =
-    Html.text (toString dateTime)
-
-
-new : String -> Maybe DateTime
-new string =
-    Just (DateTime string)
-
-
-fromString : String -> DateTime
-fromString string =
+fromLocaleString : String -> DateTime
+fromLocaleString string =
     DateTime string
 
 
@@ -33,8 +32,8 @@ fromTuple ( dateString, timeString ) =
     DateTime (String.trim dateString ++ ", " ++ String.trim timeString)
 
 
-toString : DateTime -> String
-toString (DateTime string) =
+toLocaleString : DateTime -> String
+toLocaleString (DateTime string) =
     string
 
 
@@ -55,3 +54,8 @@ toTimeString (DateTime string) =
         |> List.head
         |> Maybe.withDefault string
         |> String.trim
+
+
+toHtml : DateTime -> Html msg
+toHtml dateTime =
+    Html.text (toLocaleString dateTime)

@@ -1,11 +1,11 @@
 module Main exposing (main)
 
 import Admin exposing (Admin)
-import Api exposing (GenericData)
+import Api exposing (RemoteList)
 import Browser
 import Browser.Dom as Dom
 import Bulma.Classes as Bu
-import DateTime exposing (DateTime)
+import FormData exposing (FormData)
 import Html exposing (Html, button, div, form, h3, input, label, nav, p, section, text)
 import Html.Attributes exposing (attribute, checked, class, id, name, placeholder, style, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
@@ -14,6 +14,7 @@ import RemoteData exposing (RemoteData(..))
 import ScheduledTask exposing (ScheduledTask)
 import Session exposing (Session)
 import Task
+import TaskId exposing (TaskId)
 import User exposing (User)
 
 
@@ -38,62 +39,40 @@ main =
 type alias Model =
     { session : Session
     , formData : FormData
-    , completeTasks : RemoteTaskList
-    , scheduledTasks : RemoteTaskList
-    , admins : RemoteData Decode.Error (List Admin)
+    , completeTasks : RemoteList ScheduledTask
+    , scheduledTasks : RemoteList ScheduledTask
+    , admins : RemoteList Admin
     }
-
-
-type alias RemoteTaskList =
-    RemoteData Decode.Error (List ScheduledTask)
-
-
-type alias FormData =
-    { worker : Worker
-    , body : String
-    , date : String
-    , time : String
-    }
-
-
-type Worker
-    = SendGeneralNotification
-    | SendBoardNotification
-    | SendJackMessage
-    | SendNicoleMessage
 
 
 type alias Flags =
     { status : Maybe String
-    , dateString : String
+    , localeString : String
     }
 
 
 init : Flags -> ( Model, Cmd Msg )
-init { status, dateString } =
-    let
-        session =
-            status
-                |> User.fromMaybe
-                |> Session.fromUser dateString
-    in
-    ( { session = session
-      , formData = initFormData dateString
+init flags =
+    ( { session = initSession flags
+      , formData = initForm flags
       , scheduledTasks = NotAsked
       , completeTasks = NotAsked
       , admins = Loading
       }
-    , Cmd.map GotGenericData (Api.send Api.GetAdmins)
+    , Cmd.map GotApiData Api.getAdmins
     )
 
 
-initFormData : String -> FormData
-initFormData dateString =
-    { worker = SendBoardNotification
-    , body = ""
-    , date = dateString |> DateTime.fromString |> DateTime.toDateString
-    , time = ""
-    }
+initSession : Flags -> Session
+initSession { status, localeString } =
+    status
+        |> User.fromMaybe
+        |> Session.fromUser localeString
+
+
+initForm : Flags -> FormData
+initForm { localeString } =
+    FormData.init localeString
 
 
 
@@ -101,14 +80,16 @@ initFormData dateString =
 
 
 type Msg
-    = Ignored
-    | ClickedRadio Worker String
-    | ClickedDelete String
-    | GotGenericData GenericData
-    | GotSession Session
+    = ClickedDelete TaskId
+    | ClickedWorker FormData.Worker String
+    | ConsoleError String
+    | ConsoleInfo String
+    | ConsoleLog String
     | Focus (Result Dom.Error ())
-    | Login
-    | Logout
+    | GotApiData Api.DataToElm
+    | GotSession Session
+    | SignIn
+    | SignOut
     | SubmittedForm
     | UpdatedDate String
     | UpdatedMessage String
@@ -118,29 +99,40 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Ignored ->
-            ( model, Cmd.none )
-
-        Focus _ ->
-            ( model, Cmd.none )
-
         ClickedDelete id ->
             deleteScheduledTaskById model id
 
-        ClickedRadio worker _ ->
+        ClickedWorker worker _ ->
             updateWorker model worker
 
-        GotGenericData genericData ->
-            decodeGenericData model genericData
+        ConsoleError error ->
+            ( model, consoleError error )
+
+        ConsoleInfo info ->
+            ( model, consoleInfo info )
+
+        ConsoleLog log ->
+            ( model, consoleLog log )
+
+        Focus result ->
+            case result of
+                Err (Dom.NotFound id) ->
+                    ( model, consoleError ("Focus failed for element with id: #" ++ id) )
+
+                Ok _ ->
+                    ( model, Cmd.none )
+
+        GotApiData data ->
+            updateWithApiData model data
 
         GotSession session ->
             updateSession model session
 
-        Login ->
-            login model
+        SignIn ->
+            signIn model
 
-        Logout ->
-            logout model
+        SignOut ->
+            signOut model
 
         SubmittedForm ->
             submitForm model
@@ -155,24 +147,255 @@ update msg model =
             updateTime model string
 
 
-login : Model -> ( Model, Cmd Msg )
-login model =
-    ( model, Cmd.map GotSession (Api.send Api.Login) )
+updateWithApiData : Model -> Api.DataToElm -> ( Model, Cmd Msg )
+updateWithApiData model apiData =
+    case apiData of
+        Api.GotAdmins admins ->
+            let
+                isAuthorized =
+                    admins
+                        |> RemoteData.map
+                            (model |> toSession |> Session.email |> Admin.isAuthorized)
+                        |> RemoteData.withDefault False
+
+                ( newModel, cmd ) =
+                    if isAuthorized then
+                        ( { model
+                            | scheduledTasks = RemoteData.Loading
+                            , completeTasks = RemoteData.Loading
+                          }
+                        , focusMessageInput
+                        )
+
+                    else
+                        ( model, Cmd.none )
+            in
+            ( { newModel | admins = admins }, cmd )
+
+        Api.GotCompleteTasks tasks ->
+            ( { model | completeTasks = tasks }, Cmd.none )
+
+        Api.GotScheduledTasks tasks ->
+            ( { model | scheduledTasks = tasks }, Cmd.none )
+
+        Api.Unrecognized ->
+            ( model, Cmd.none )
 
 
-logout : Model -> ( Model, Cmd Msg )
-logout model =
-    ( { model | scheduledTasks = NotAsked, completeTasks = NotAsked }
-    , Cmd.map GotSession (Api.send Api.Logout)
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.batch
+        [ Session.changes GotSession (toSession model)
+        , Sub.map GotApiData Api.subscription
+        ]
+
+
+
+-- VIEW
+
+
+view : Model -> Browser.Document Msg
+view model =
+    let
+        user =
+            Session.user (toSession model)
+    in
+    { title = "CJA Twilio Scheduler"
+    , body =
+        [ section [ class Bu.section ]
+            [ div [ class Bu.container ]
+                [ navHeader user
+                , inputSection model
+                , scheduledTaskSection model
+                , completeTaskSection model
+                ]
+            ]
+        ]
+    }
+
+
+navHeader : User -> Html Msg
+navHeader user =
+    nav [ class Bu.navbar, class Bu.isLight, class Bu.isSpaced ]
+        [ div [ class Bu.navbarBrand ] [ div [ class Bu.navbarItem, class Bu.isSize3 ] [ text "CJA Twilio Scheduler" ] ]
+        , div [ class Bu.navbarEnd ]
+            [ div [ class Bu.navbarItem ] [ text (User.displayName user) ]
+            , div [ class Bu.navbarItem ] [ text (User.displayEmail user) ]
+            , div [ class Bu.navbarItem ] [ div [ class Bu.buttons ] [ signInButton user ] ]
+            ]
+        ]
+
+
+signInButton : User -> Html Msg
+signInButton user =
+    case user of
+        User.Anonymous ->
+            button [ onClick SignIn, class Bu.button, class Bu.isPrimary ] [ text "Sign in" ]
+
+        User.Pending _ ->
+            button [ attribute "disabled" "", class Bu.button, class Bu.isPrimary, class Bu.isLoading ] [ text "Signing in" ]
+
+        User.SignedIn _ ->
+            button [ onClick SignOut, class Bu.button, class Bu.isPrimary ] [ text "Sign out" ]
+
+
+inputSection : Model -> Html Msg
+inputSection model =
+    section [ class "section" ]
+        [ h3 [ class Bu.isSize3 ] [ text "Schedule Message" ]
+        , inputForm model
+        ]
+
+
+inputForm : Model -> Html Msg
+inputForm model =
+    case Session.user (toSession model) of
+        User.SignedIn _ ->
+            loggedInForm model.formData
+
+        _ ->
+            p [] [ text "Only logged in users can input data." ]
+
+
+loggedInForm : FormData -> Html Msg
+loggedInForm formData =
+    form [ id "input-form", onSubmit SubmittedForm ]
+        [ workerMenu formData
+        , inputField bodyInputId "Message" formData.body "Your message here" UpdatedMessage
+        , inputField "time-input" "Time" formData.time "13:15 or 1:15 PM" UpdatedTime
+        , inputField "date-input" "Date" formData.date "01/01/2001" UpdatedDate
+        , button [ id "submit-button", class Bu.button, class Bu.isInfo ] [ text "Send" ]
+        ]
+
+
+inputField : String -> String -> String -> String -> (String -> Msg) -> Html Msg
+inputField id_ label_ value_ placeholder_ toMsg =
+    div [ class Bu.field ]
+        [ label [ class Bu.label ] [ text label_ ]
+        , div [ class Bu.control ]
+            [ input [ id id_, class Bu.input, type_ "text", placeholder placeholder_, value value_, onInput toMsg ]
+                []
+            ]
+        ]
+
+
+workerMenu : FormData -> Html Msg
+workerMenu formData =
+    div [ class Bu.field ]
+        [ div [ class Bu.control ]
+            [ radio "Send Board Broadcast"
+                (formData.worker == FormData.SendBoardNotification)
+                (ClickedWorker FormData.SendBoardNotification)
+            , radio "Send General Broadcast"
+                (formData.worker == FormData.SendGeneralNotification)
+                (ClickedWorker FormData.SendGeneralNotification)
+            , radio "Send Jack Message"
+                (formData.worker == FormData.SendJackMessage)
+                (ClickedWorker FormData.SendJackMessage)
+            , radio "Send Nicole Message"
+                (formData.worker == FormData.SendNicoleMessage)
+                (ClickedWorker FormData.SendNicoleMessage)
+            ]
+        ]
+
+
+radio : String -> Bool -> (String -> msg) -> Html msg
+radio value isChecked msg =
+    label
+        [ style "padding" "20px", class Bu.radio ]
+        [ input [ type_ "radio", name "worker-type", onInput msg, checked isChecked ] []
+        , text value
+        ]
+
+
+scheduledTaskSection : Model -> Html Msg
+scheduledTaskSection model =
+    taskSection "Scheduled Tasks" model.scheduledTasks
+
+
+completeTaskSection : Model -> Html Msg
+completeTaskSection model =
+    taskSection "Complete Tasks" model.completeTasks
+
+
+taskSection : String -> RemoteList ScheduledTask -> Html Msg
+taskSection title taskList =
+    section [ class Bu.section ]
+        [ h3 [ class Bu.isSize3 ] [ text title ]
+        , scheduledTaskList taskList
+        ]
+
+
+scheduledTaskList : RemoteList ScheduledTask -> Html Msg
+scheduledTaskList remoteData =
+    case remoteData of
+        Loading ->
+            text "Loading"
+
+        NotAsked ->
+            text "Only logged in users can see this data."
+
+        Failure e ->
+            text ("Error: " ++ Decode.errorToString e)
+
+        Success list ->
+            ScheduledTask.listToHtml ClickedDelete list
+
+
+
+-- HELPERS
+-- UI
+
+
+bodyInputId : String
+bodyInputId =
+    "body-input"
+
+
+focusMessageInput : Cmd Msg
+focusMessageInput =
+    Task.attempt Focus (Dom.focus bodyInputId)
+
+
+
+-- LOGGING
+
+
+consoleError : String -> Cmd msg
+consoleError error =
+    Api.consoleError error
+
+
+consoleInfo : String -> Cmd msg
+consoleInfo info =
+    Api.consoleInfo info
+
+
+consoleLog : String -> Cmd msg
+consoleLog log =
+    Api.consoleLog log
+
+
+
+-- TASKS
+
+
+deleteScheduledTaskById : Model -> TaskId -> ( Model, Cmd Msg )
+deleteScheduledTaskById model id =
+    ( model
+    , Cmd.map ConsoleLog (Api.deleteTask id)
     )
 
 
-updateSession : Model -> Session -> ( Model, Cmd Msg )
-updateSession model session =
-    ( { model | session = session }, focusMessageInput )
+
+-- FORM
 
 
-updateWorker : Model -> Worker -> ( Model, Cmd Msg )
+updateWorker : Model -> FormData.Worker -> ( Model, Cmd Msg )
 updateWorker ({ formData } as model) worker =
     let
         newFormData =
@@ -209,273 +432,41 @@ updateTime ({ formData } as model) string =
 
 
 submitForm : Model -> ( Model, Cmd Msg )
-submitForm ({ formData } as model) =
+submitForm model =
     let
-        apiCmd =
-            workerToCmd formData.worker
-                { body = formData.body
-                , dateString = ( formData.date, formData.time ) |> DateTime.fromTuple |> DateTime.toString
-                }
+        ( subModel, subCmd ) =
+            FormData.submit model.formData
     in
-    ( { model | formData = { formData | body = "", time = "" } }
-    , Cmd.batch [ apiCmd, focusMessageInput ]
+    ( { model | formData = subModel }
+    , Cmd.batch
+        [ subCmd
+        , focusMessageInput
+        ]
     )
 
 
-deleteScheduledTaskById : Model -> String -> ( Model, Cmd Msg )
-deleteScheduledTaskById model id =
-    ( model
-    , Cmd.map (\_ -> Ignored) (Api.send (Api.DeleteTask id))
+
+-- SESSION
+
+
+signIn : Model -> ( Model, Cmd Msg )
+signIn model =
+    ( model, Cmd.map GotSession Api.signIn )
+
+
+signOut : Model -> ( Model, Cmd Msg )
+signOut model =
+    ( { model
+        | scheduledTasks = NotAsked
+        , completeTasks = NotAsked
+      }
+    , Cmd.map GotSession Api.signOut
     )
 
 
-workerToCmd : Worker -> (Api.Payload -> Cmd msg)
-workerToCmd worker =
-    let
-        tag =
-            case worker of
-                SendJackMessage ->
-                    Api.SendJackMessage
-
-                SendNicoleMessage ->
-                    Api.SendNicoleMessage
-
-                SendGeneralNotification ->
-                    Api.SendGeneralNotification
-
-                SendBoardNotification ->
-                    Api.SendBoardNotification
-    in
-    tag >> Api.send
-
-
-bodyInputId : String
-bodyInputId =
-    "body-input"
-
-
-focusMessageInput : Cmd Msg
-focusMessageInput =
-    Task.attempt Focus (Dom.focus bodyInputId)
-
-
-decodeGenericData : Model -> GenericData -> ( Model, Cmd Msg )
-decodeGenericData model { tag, payload } =
-    case tag of
-        "GotAdmins" ->
-            let
-                admins =
-                    payload
-                        |> Decode.decodeValue (Decode.list Admin.decoder)
-                        |> RemoteData.fromResult
-
-                email =
-                    model.session
-                        |> Session.user
-                        |> User.email
-
-                isAuthorized =
-                    RemoteData.map (Admin.isAuthorized email) admins
-
-                ( newModel, cmd ) =
-                    case isAuthorized of
-                        RemoteData.Success auth ->
-                            if auth then
-                                ( { model
-                                    | scheduledTasks = RemoteData.Loading
-                                    , completeTasks = RemoteData.Loading
-                                  }
-                                , focusMessageInput
-                                )
-
-                            else
-                                ( model, Cmd.none )
-
-                        _ ->
-                            ( model, Cmd.none )
-            in
-            ( { newModel | admins = admins }, cmd )
-
-        "GotComplete" ->
-            let
-                tasks =
-                    payload
-                        |> Decode.decodeValue (Decode.list ScheduledTask.decoder)
-                        |> RemoteData.fromResult
-            in
-            ( { model | completeTasks = tasks }, Cmd.none )
-
-        "GotScheduled" ->
-            let
-                tasks =
-                    payload
-                        |> Decode.decodeValue (Decode.list ScheduledTask.decoder)
-                        |> RemoteData.fromResult
-            in
-            ( { model | scheduledTasks = tasks }, Cmd.none )
-
-        _ ->
-            ( model, Cmd.none )
-
-
-
--- SUBSCRIPTIONS
-
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.batch
-        [ Session.changes GotSession (toSession model)
-        , Api.dataToElm GotGenericData
-        ]
-
-
-
--- VIEW
-
-
-view : Model -> Browser.Document Msg
-view model =
-    let
-        user =
-            Session.user (toSession model)
-    in
-    { title = "CJA Twilio Scheduler"
-    , body =
-        [ section [ class Bu.section ]
-            [ div [ class Bu.container ]
-                [ navHeader user
-                , inputSection model
-                , scheduledTaskSection model
-                , completeTaskSection model
-                ]
-            ]
-        ]
-    }
-
-
-navHeader : User -> Html Msg
-navHeader user =
-    nav [ class Bu.navbar, class Bu.isLight, class Bu.isSpaced ]
-        [ div [ class Bu.navbarBrand ] [ div [ class Bu.navbarItem, class Bu.isSize3 ] [ text "CJA Twilio Scheduler" ] ]
-        , div [ class Bu.navbarEnd ]
-            [ div [ class Bu.navbarItem ] [ text (User.displayName user) ]
-            , div [ class Bu.navbarItem ] [ text (User.displayEmail user) ]
-            , div [ class Bu.navbarItem ] [ div [ class Bu.buttons ] [ loginButton user ] ]
-            ]
-        ]
-
-
-loginButton : User -> Html Msg
-loginButton user =
-    case user of
-        User.Anonymous ->
-            button [ onClick Login, class Bu.button, class Bu.isPrimary ] [ text "Login" ]
-
-        User.Pending _ ->
-            button [ attribute "disabled" "", class Bu.button, class Bu.isPrimary, class Bu.isLoading ] [ text "Loggin in" ]
-
-        User.LoggedIn _ ->
-            button [ onClick Logout, class Bu.button, class Bu.isPrimary ] [ text "Logout" ]
-
-
-inputSection : Model -> Html Msg
-inputSection model =
-    section [ class "section" ]
-        [ h3 [ class Bu.isSize3 ] [ text "Schedule Message" ]
-        , inputForm model
-        ]
-
-
-inputForm : Model -> Html Msg
-inputForm model =
-    case Session.user (toSession model) of
-        User.LoggedIn _ ->
-            loggedInForm model.formData
-
-        _ ->
-            p [] [ text "Only logged in users can input data." ]
-
-
-loggedInForm : FormData -> Html Msg
-loggedInForm formData =
-    form [ id "input-form", onSubmit SubmittedForm ]
-        [ workerMenu formData
-        , inputField bodyInputId "Message" formData.body "Your message here" UpdatedMessage
-        , inputField "time-input" "Time" formData.time "13:15 or 1:15 PM" UpdatedTime
-        , inputField "date-input" "Date" formData.date "01/01/2001" UpdatedDate
-        , button [ id "submit-button", class Bu.button, class Bu.isInfo ] [ text "Send" ]
-        ]
-
-
-inputField : String -> String -> String -> String -> (String -> Msg) -> Html Msg
-inputField id_ label_ value_ placeholder_ toMsg =
-    div [ class Bu.field ]
-        [ label [ class Bu.label ] [ text label_ ]
-        , div [ class Bu.control ]
-            [ input [ id id_, class Bu.input, type_ "text", placeholder placeholder_, value value_, onInput toMsg ]
-                []
-            ]
-        ]
-
-
-workerMenu : FormData -> Html Msg
-workerMenu formData =
-    div [ class Bu.field ]
-        [ div [ class Bu.control ]
-            [ radio "Send Board Broadcast" (formData.worker == SendBoardNotification) (ClickedRadio SendBoardNotification)
-            , radio "Send General Broadcast" (formData.worker == SendGeneralNotification) (ClickedRadio SendGeneralNotification)
-            , radio "Send Jack Message" (formData.worker == SendJackMessage) (ClickedRadio SendJackMessage)
-            , radio "Send Nicole Message" (formData.worker == SendNicoleMessage) (ClickedRadio SendNicoleMessage)
-            ]
-        ]
-
-
-radio : String -> Bool -> (String -> msg) -> Html msg
-radio value isChecked msg =
-    label
-        [ style "padding" "20px", class Bu.radio ]
-        [ input [ type_ "radio", name "worker-type", onInput msg, checked isChecked ] []
-        , text value
-        ]
-
-
-scheduledTaskSection : Model -> Html Msg
-scheduledTaskSection model =
-    taskSection "Scheduled Tasks" model.scheduledTasks
-
-
-completeTaskSection : Model -> Html Msg
-completeTaskSection model =
-    taskSection "Complete Tasks" model.completeTasks
-
-
-taskSection : String -> RemoteTaskList -> Html Msg
-taskSection title taskList =
-    section [ class Bu.section ]
-        [ h3 [ class Bu.isSize3 ] [ text title ]
-        , scheduledTaskList taskList
-        ]
-
-
-scheduledTaskList : RemoteTaskList -> Html Msg
-scheduledTaskList remoteData =
-    case remoteData of
-        Loading ->
-            text "Loading"
-
-        NotAsked ->
-            text "Only logged in users can see this data."
-
-        Failure e ->
-            text ("Error: " ++ Decode.errorToString e)
-
-        Success list ->
-            ScheduledTask.listToHtml ClickedDelete list
-
-
-
--- HELPERS
+updateSession : Model -> Session -> ( Model, Cmd Msg )
+updateSession model session =
+    ( { model | session = session }, focusMessageInput )
 
 
 toSession : Model -> Session

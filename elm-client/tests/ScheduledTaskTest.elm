@@ -71,21 +71,21 @@ suite =
         , test "DateTime" <|
             \_ ->
                 "8/13/2019, 11:52:00 PM"
-                    |> DateTime.fromString
-                    |> DateTime.toString
+                    |> DateTime.fromLocaleString
+                    |> DateTime.toLocaleString
                     |> Expect.equal
                         "8/13/2019, 11:52:00 PM"
         , test "DateTime date" <|
             \_ ->
                 "8/13/2019, 11:52:00 PM"
-                    |> DateTime.fromString
+                    |> DateTime.fromLocaleString
                     |> DateTime.toDateString
                     |> Expect.equal
                         "8/13/2019"
         , test "DateTime time" <|
             \_ ->
                 "8/13/2019, 11:52:00 PM"
-                    |> DateTime.fromString
+                    |> DateTime.fromLocaleString
                     |> DateTime.toTimeString
                     |> Expect.equal
                         "11:52:00 PM"
@@ -93,7 +93,7 @@ suite =
             \_ ->
                 ( "8/13/2019", "11:52:00 PM" )
                     |> DateTime.fromTuple
-                    |> DateTime.toString
+                    |> DateTime.toLocaleString
                     |> Expect.equal
                         "8/13/2019, 11:52:00 PM"
         ]

@@ -1,4 +1,4 @@
-module Worker exposing (Worker(..), decoder, encode, toString, toHtml)
+module Worker exposing (Worker(..), decoder, encode, toHtml, toString)
 
 import Html exposing (Html)
 import Json.Decode as Decode exposing (Decoder)

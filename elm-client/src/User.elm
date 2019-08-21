@@ -1,6 +1,7 @@
 module User exposing
     ( User(..)
-    , decode
+    , decodeWithDefault
+    , decoder
     , displayEmail
     , displayName
     , email
@@ -15,7 +16,7 @@ import UserId exposing (UserId)
 
 
 type User
-    = LoggedIn UserData
+    = SignedIn UserData
     | Anonymous
     | Pending PendingData
 
@@ -41,17 +42,17 @@ fromMaybe maybe =
             Pending "Pending"
 
 
-decode : Value -> User
-decode value =
+decodeWithDefault : User -> Value -> User
+decodeWithDefault default value =
     value
-        |> Decode.decodeValue decodeUser
-        |> Result.withDefault Anonymous
+        |> Decode.decodeValue decoder
+        |> Result.withDefault default
 
 
-decodeUser : Decoder User
-decodeUser =
+decoder : Decoder User
+decoder =
     Decode.oneOf
-        [ Decode.map LoggedIn decodeUserData
+        [ Decode.map SignedIn decodeUserData
         , Decode.map Pending decodePendingUserData
         ]
 
@@ -72,7 +73,7 @@ decodePendingUserData =
 displayName : User -> String
 displayName user =
     case user of
-        LoggedIn data ->
+        SignedIn data ->
             data.displayName
 
         Pending _ ->
@@ -85,7 +86,7 @@ displayName user =
 displayEmail : User -> String
 displayEmail user =
     case user of
-        LoggedIn userData ->
+        SignedIn userData ->
             Email.toString userData.email
 
         Anonymous ->
@@ -98,7 +99,7 @@ displayEmail user =
 uid : User -> Maybe UserId
 uid user =
     case user of
-        LoggedIn data ->
+        SignedIn data ->
             Just data.uid
 
         _ ->
@@ -108,7 +109,7 @@ uid user =
 email : User -> Email
 email user =
     case user of
-        LoggedIn data ->
+        SignedIn data ->
             data.email
 
         Pending _ ->
@@ -116,5 +117,3 @@ email user =
 
         Anonymous ->
             Email.fromString "Anonymous"
-
-

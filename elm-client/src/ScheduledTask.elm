@@ -68,35 +68,30 @@ notificationDecoder =
     Decode.map Notification NotificationOptions.decoder
 
 
-listToHtml : (String -> msg) -> List ScheduledTask -> Html msg
-listToHtml toMsg scheduledTaskList =
-    let
-        list =
-            scheduledTaskList
-                |> List.map (toHtml toMsg)
-    in
-    case list of
+listToHtml : (TaskId -> msg) -> List ScheduledTask -> Html msg
+listToHtml deleteMsg scheduledTaskList =
+    case List.map (toHtml deleteMsg) scheduledTaskList of
         [] ->
             div [] [ p [] [ text "No entries" ] ]
 
-        _ ->
+        list ->
             div []
                 [ table [ class Bu.table, class Bu.isFullwidth ]
                     [ tbody [] list ]
                 ]
 
 
-toHtml : (String -> msg) -> ScheduledTask -> Html msg
-toHtml toMsg scheduledTask =
+toHtml : (TaskId -> msg) -> ScheduledTask -> Html msg
+toHtml deleteMsg scheduledTask =
     div [ class Bu.columns ]
-        [ deleteButton toMsg scheduledTask
-        , dateTimeColumn scheduledTask
-        , workerColumn scheduledTask
-        , optionsColumn scheduledTask
+        [ deleteButton deleteMsg scheduledTask
+        , dateTimeColumn scheduledTask.performAt
+        , workerColumn scheduledTask.worker
+        , optionsColumn scheduledTask.options
         ]
 
 
-deleteButton : (String -> msg) -> ScheduledTask -> Html msg
+deleteButton : (TaskId -> msg) -> ScheduledTask -> Html msg
 deleteButton toMsg scheduledTask =
     case scheduledTask.status of
         Status.Scheduled ->
@@ -113,19 +108,19 @@ deleteButton toMsg scheduledTask =
             text ""
 
 
-dateTimeColumn : ScheduledTask -> Html msg
-dateTimeColumn scheduledTask =
-    div [ class Bu.column, class Bu.is2, class Bu.isPulledRight ] [ DateTime.toHtml scheduledTask.performAt ]
+dateTimeColumn : DateTime -> Html msg
+dateTimeColumn performAt =
+    div [ class Bu.column, class Bu.is2, class Bu.isPulledRight ] [ DateTime.toHtml performAt ]
 
 
-workerColumn : ScheduledTask -> Html msg
-workerColumn scheduledTask =
-    div [ class Bu.column, class Bu.is3 ] [ Worker.toHtml scheduledTask.worker ]
+workerColumn : Worker -> Html msg
+workerColumn worker =
+    div [ class Bu.column, class Bu.is3 ] [ Worker.toHtml worker ]
 
 
-optionsColumn : ScheduledTask -> Html msg
-optionsColumn scheduledTask =
-    div [ class Bu.column ] [ optionsToHtml scheduledTask.options ]
+optionsColumn : Options -> Html msg
+optionsColumn options =
+    div [ class Bu.column ] [ optionsToHtml options ]
 
 
 optionsToHtml : Options -> Html msg
@@ -138,6 +133,6 @@ optionsToHtml options =
             NotificationOptions.toHtml notificationOptions
 
 
-id : ScheduledTask -> String
+id : ScheduledTask -> TaskId
 id scheduledTask =
-    TaskId.toString scheduledTask.id
+    scheduledTask.id

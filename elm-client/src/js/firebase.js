@@ -43,38 +43,38 @@ export const signOut = () => auth.signOut();
 
 export const tasks = firestore().collection(Tasks);
 
-export const sendMessage = ({ dateString, phoneNumber, body }) => {
+export const sendMessage = ({ localeString, phoneNumber, body }) => {
   const worker = SendMessage;
-  return addTask(dateString, worker, { phoneNumber, body });
+  return addTask(localeString, worker, { phoneNumber, body });
 };
 
-export const sendBoardMessage = ({ dateString, phoneNumber, body }) => {
+export const sendBoardMessage = ({ localeString, phoneNumber, body }) => {
   const worker = SendBoardMessage;
-  return addTask(dateString, worker, { phoneNumber, body });
+  return addTask(localeString, worker, { phoneNumber, body });
 };
 
-export const sendNotification = ({ dateString, body }) => {
+export const sendNotification = ({ localeString, body }) => {
   const worker = SendNotification;
-  return addTask(dateString, worker, { body });
+  return addTask(localeString, worker, { body });
 };
 
-export const sendBoardNotification = ({ dateString, body }) => {
+export const sendBoardNotification = ({ localeString, body }) => {
   const worker = SendBoardNotification;
-  return addTask(dateString, worker, { body });
+  return addTask(localeString, worker, { body });
 };
 
 export const deleteTask = id => tasks
   .doc(id)
   .delete()
   .then(() => {
-    console.log('Document deleted with id:', id);
+    console.log('Firestore document deleted with id:', id);
   })
   .catch((error) => {
-    console.error('Error deleting document:', error);
+    console.error('Error deleting Firestore document:', error);
   });
 
-const addTask = (dateString, worker, options) => {
-  const performAt = firestore.Timestamp.fromDate(new Date(dateString));
+const addTask = (localeString, worker, options) => {
+  const performAt = firestore.Timestamp.fromDate(new Date(localeString));
   return tasks
     .add({
       status: Scheduled,
@@ -83,10 +83,10 @@ const addTask = (dateString, worker, options) => {
       options,
     })
     .then((docRef) => {
-      console.log('Document written with id:', docRef.id);
+      console.log('Firestore document written with id:', docRef.id);
     })
     .catch((error) => {
-      console.error('Error adding document:', error);
+      console.error('Error adding Firestore document:', error);
     });
 };
 
