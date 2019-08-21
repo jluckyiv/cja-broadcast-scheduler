@@ -6,10 +6,10 @@
   "license": "MIT",
   "scripts": {
     "autotest": "elm-test --watch",
-    "build": "rm -r dist && parcel build src/index.html --public-url ./",
+    "build": "rm -r dist && parcel build index.html --public-url ./",
     "deploy": "yarn run build && firebase deploy --only hosting",
     "serve": "yarn run build && firebase serve --only hosting",
-    "start": "parcel src/index.html",
+    "start": "parcel index.html",
     "test": "elm-test"
   },
   "dependencies": {
