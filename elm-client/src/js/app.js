@@ -1,66 +1,61 @@
 import {
   JacksNumber,
   NicolesNumber,
-  admins,
   auth,
   completeTasksQuery,
   deleteTask,
-  firestore,
   getAdmins,
-  gotCompleteTasks,
   scheduledTasksQuery,
   sendBoardNotification,
   sendMessage,
   sendNotification,
   signIn,
-  signOut,
-  tasks,
-} from './firebase';
-import { Elm } from '../Main.elm';
+  signOut
+} from "./firebase";
+import { Elm } from "../Main.elm";
 
 // Setup and helpers
-const StorageKey = 'AwaitingSignInResponse';
+const StorageKey = "AwaitingSignInResponse";
 const getSignInResponseStatus = () => localStorage.getItem(StorageKey);
-const setSignInResponseStatus = value => localStorage.setItem(StorageKey, value);
+const setSignInResponseStatus = value =>
+  localStorage.setItem(StorageKey, value);
 
 const formatDoc = doc => formatPayload(doc.data(), doc.id);
 const formatPayload = (task, id) => ({
   id,
   options: task.options,
-  performAt: task.performAt.toDate().toLocaleString('en-US'),
+  performAt: task.performAt.toDate().toLocaleString("en-US"),
   status: task.status,
-  worker: task.worker,
+  worker: task.worker
 });
 
 // Elm app
 const flags = {
   status: getSignInResponseStatus(),
-  localeString: new Date().toLocaleString('en-US'),
+  localeString: new Date().toLocaleString("en-US")
 };
 
 const app = Elm.Main.init({
-  node: document.getElementById('app'),
-  flags,
+  node: document.getElementById("app"),
+  flags
 });
 
 // Ports
-const ConsoleError = 'ConsoleError';
-const ConsoleInfo = 'ConsoleInfo';
-const ConsoleLog = 'ConsoleLog';
-const DeleteTask = 'DeleteTask';
-const GetAdmins = 'GetAdmins';
-const GetComplete = 'GetComplete';
-const GetScheduled = 'GetScheduled';
-const GotAdmins = 'GotAdmins';
-const GotComplete = 'GotComplete';
-const GotScheduled = 'GotScheduled';
-const Pending = 'Pending';
-const SendBoardNotification = 'SendBoardNotification';
-const SendGeneralNotification = 'SendGeneralNotification';
-const SendJackMessage = 'SendJackMessage';
-const SendNicoleMessage = 'SendNicoleMessage';
-const SignIn = 'SignIn';
-const SignOut = 'SignOut';
+const ConsoleError = "ConsoleError";
+const ConsoleInfo = "ConsoleInfo";
+const ConsoleLog = "ConsoleLog";
+const DeleteTask = "DeleteTask";
+const GetAdmins = "GetAdmins";
+const GotAdmins = "GotAdmins";
+const GotComplete = "GotComplete";
+const GotScheduled = "GotScheduled";
+const Pending = "Pending";
+const SendBoardNotification = "SendBoardNotification";
+const SendGeneralNotification = "SendGeneralNotification";
+const SendJackMessage = "SendJackMessage";
+const SendNicoleMessage = "SendNicoleMessage";
+const SignIn = "SignIn";
+const SignOut = "SignOut";
 
 app.ports.dataFromElm.subscribe(({ tag, payload }) => {
   console.log(tag, payload);
@@ -83,28 +78,28 @@ app.ports.dataFromElm.subscribe(({ tag, payload }) => {
       sendMessage({
         localeString: payload.localeString,
         phoneNumber: JacksNumber,
-        body: payload.body,
+        body: payload.body
       });
       break;
     case SendNicoleMessage:
       sendMessage({
         localeString: payload.localeString,
         phoneNumber: NicolesNumber,
-        body: payload.body,
+        body: payload.body
       });
       break;
     case SendGeneralNotification:
-      console.log('SendGeneralNotification:', payload);
+      console.log("SendGeneralNotification:", payload);
       sendNotification({
         localeString: payload.localeString,
-        body: payload.body,
+        body: payload.body
       });
       break;
     case SendBoardNotification:
-      console.log('SendBoardNotification:', payload);
+      console.log("SendBoardNotification:", payload);
       sendBoardNotification({
         localeString: payload.localeString,
-        body: payload.body,
+        body: payload.body
       });
       break;
     case SignIn:
@@ -126,21 +121,21 @@ const dataToElm = (tag, payload) => {
 
 let unsubscribeScheduled;
 let unsubscribeComplete;
-auth.onAuthStateChanged((user) => {
+auth.onAuthStateChanged(user => {
   setSignInResponseStatus(null);
   if (user) {
     unsubscribeScheduled = scheduledTasksQuery().onSnapshot(
-      (data) => {
+      data => {
         dataToElm(GotScheduled, data.docs.map(doc => formatDoc(doc)));
       },
-      error => console.error('Scheduled snapshot error', error),
+      error => console.error("Scheduled snapshot error", error)
     );
 
     unsubscribeComplete = completeTasksQuery().onSnapshot(
-      (data) => {
+      data => {
         dataToElm(GotComplete, data.docs.map(doc => formatDoc(doc)));
       },
-      error => console.error('Complete snapshot error', error),
+      error => console.error("Complete snapshot error", error)
     );
   } else {
     if (unsubscribeComplete) {
