@@ -69,7 +69,9 @@ export const sendBoardNotification = ({ localeString, body }, onError) => {
   return addTask(localeString, worker, { body }, onError);
 };
 
-export const deleteTask = id => tasks.doc(id).delete();
+export const deleteTask = id => {
+  return tasks.doc(id).delete();
+};
 
 const addTask = (localeString, worker, options) => {
   const performAt = firestore.Timestamp.fromDate(new Date(localeString));

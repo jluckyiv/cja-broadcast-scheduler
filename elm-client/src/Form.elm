@@ -1,7 +1,8 @@
-module Form exposing (Model, Msg, Worker(..), init, submit, update, view)
+module Form exposing (Model, Msg, Worker(..), init, submit, subscription, update, view)
 
 import Api exposing (RemoteList)
 import Api.Payload exposing (Payload)
+import Browser.Dom as Dom
 import Bulma.Classes as Bu
 import DateTime
 import DateTime.Date as Date
@@ -9,6 +10,7 @@ import DateTime.Time as Time
 import Html exposing (Html, button, div, form, input, label, p, text)
 import Html.Attributes exposing (attribute, checked, class, id, name, placeholder, style, type_, value)
 import Html.Events exposing (onInput, onSubmit)
+import Task
 import Validate exposing (Valid, Validator)
 
 
@@ -42,15 +44,17 @@ type Worker
     | SendNicoleMessage
 
 
-init : String -> Model
+init : String -> ( Model, Cmd Msg )
 init localeString =
-    checkErrors
+    ( checkErrors
         { worker = SendBoardNotification
         , body = ""
         , time = ""
         , date = localeString |> DateTime.fromLocaleString |> DateTime.toDateString
         , errors = []
         }
+    , Cmd.none
+    )
 
 
 
@@ -59,6 +63,8 @@ init localeString =
 
 type Msg
     = Ignored
+    | Focus (Result Dom.Error ())
+    | GotApiData Api.DataToElm
     | ClickedWorker Worker
     | SubmittedForm
     | UpdatedDate String
@@ -71,6 +77,25 @@ update msg model =
     case msg of
         Ignored ->
             ( model, Cmd.none )
+
+        Focus result ->
+            case result of
+                Err (Dom.NotFound id) ->
+                    ( model, Api.consoleError ("Focus failed for element with id: #" ++ id) )
+
+                Ok _ ->
+                    ( model, Cmd.none )
+
+        GotApiData apiData ->
+            case apiData of
+                Api.GotAdmins _ ->
+                    ( model, focusMessageInput )
+
+                Api.GotFirebaseSuccess (Just "DeleteTask") ->
+                    ( model, focusMessageInput )
+
+                _ ->
+                    ( model, Cmd.none )
 
         SubmittedForm ->
             submit model
@@ -88,7 +113,7 @@ update msg model =
             updateTime model string
 
 
-submit : Model -> ( Model, Cmd msg )
+submit : Model -> ( Model, Cmd Msg )
 submit model =
     case validateModel model of
         Ok validModel ->
@@ -98,7 +123,7 @@ submit model =
             ( { model | errors = errors }, Cmd.none )
 
 
-submitValid : Valid Model -> ( Model, Cmd msg )
+submitValid : Valid Model -> ( Model, Cmd Msg )
 submitValid validModel =
     let
         model =
@@ -111,7 +136,7 @@ submitValid validModel =
             workerToCmd model.worker (Payload model.body localeString)
     in
     ( checkErrors { model | body = "", time = "" }
-    , apiCmd
+    , Cmd.batch [ apiCmd, focusMessageInput ]
     )
 
 
@@ -213,8 +238,18 @@ isInvalidDate string =
 -- VIEW
 
 
-view : String -> Model -> Html Msg
-view id_ model =
+bodyInputId : String
+bodyInputId =
+    "body-input"
+
+
+focusMessageInput : Cmd Msg
+focusMessageInput =
+    Task.attempt Focus (Dom.focus bodyInputId)
+
+
+view : Model -> Html Msg
+view model =
     let
         ( onSubmit_, submitButton ) =
             case model.errors of
@@ -230,7 +265,7 @@ view id_ model =
     in
     form [ id "input-form", onSubmit onSubmit_ ]
         [ workerMenu model
-        , inputField model Body id_ "Message" "Your message here" UpdatedMessage
+        , inputField model Body bodyInputId "Message" "Your message here" UpdatedMessage
         , inputField model Time "time-input" "Time" "E.g., 1:15 PM" UpdatedTime
         , inputField model Date "date-input" "Date" "1/1/19" UpdatedDate
         , submitButton
@@ -294,4 +329,11 @@ inputField model field id_ label_ placeholder_ toMsg =
                 []
             ]
         , p [ class Bu.help, class Bu.isDanger ] [ text help_ ]
+        ]
+
+
+subscription : Sub Msg
+subscription =
+    Sub.batch
+        [ Sub.map GotApiData Api.subscription
         ]

@@ -3,7 +3,6 @@ module Main exposing (main)
 import Admin exposing (Admin)
 import Api exposing (RemoteList)
 import Browser
-import Browser.Dom as Dom
 import Bulma.Classes as Bu
 import Form
 import Html exposing (Html, button, div, h3, nav, p, section, text)
@@ -14,7 +13,6 @@ import RemoteData exposing (RemoteData(..))
 import ScheduledTask exposing (ScheduledTask)
 import ScheduledTask.TaskId exposing (TaskId)
 import Session exposing (Session)
-import Task
 import User exposing (User)
 
 
@@ -53,13 +51,20 @@ type alias Flags =
 
 init : Flags -> ( Model, Cmd Msg )
 init flags =
+    let
+        ( formData, formMsg ) =
+            Form.init flags.localeString
+    in
     ( { session = initSession flags
-      , formData = Form.init flags.localeString
+      , formData = formData
       , scheduledTasks = NotAsked
       , completeTasks = NotAsked
       , admins = Loading
       }
-    , Cmd.map GotApiData Api.getAdmins
+    , Cmd.batch
+        [ Cmd.map GotApiData Api.getAdmins
+        , Cmd.map GotFormMsg formMsg
+        ]
     )
 
 
@@ -79,13 +84,11 @@ type Msg
     | ConsoleError String
     | ConsoleInfo String
     | ConsoleLog String
-    | Focus (Result Dom.Error ())
     | GotApiData Api.DataToElm
     | GotFormMsg Form.Msg
     | GotSession Session
     | SignIn
     | SignOut
-    | SubmittedForm
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -102,14 +105,6 @@ update msg model =
 
         ConsoleLog log ->
             ( model, consoleLog log )
-
-        Focus result ->
-            case result of
-                Err (Dom.NotFound id) ->
-                    ( model, consoleError ("Focus failed for element with id: #" ++ id) )
-
-                Ok _ ->
-                    ( model, Cmd.none )
 
         GotApiData data ->
             updateWithApiData model data
@@ -129,9 +124,6 @@ update msg model =
 
         SignOut ->
             signOut model
-
-        SubmittedForm ->
-            submitForm model
 
 
 updateWithApiData : Model -> Api.DataToElm -> ( Model, Cmd Msg )
@@ -157,7 +149,7 @@ updateWithApiData model apiData =
                             | scheduledTasks = RemoteData.Loading
                             , completeTasks = RemoteData.Loading
                           }
-                        , focusMessageInput
+                        , Cmd.none
                         )
 
                     else
@@ -173,18 +165,6 @@ updateWithApiData model apiData =
 
         Api.Unrecognized ->
             ( model, Cmd.none )
-
-
-
--- SUBSCRIPTIONS
-
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.batch
-        [ Session.changes GotSession (toSession model)
-        , Sub.map GotApiData Api.subscription
-        ]
 
 
 
@@ -248,7 +228,7 @@ inputForm : Model -> Html Msg
 inputForm model =
     case Session.user (toSession model) of
         User.SignedIn _ ->
-            Html.map GotFormMsg (Form.view bodyInputId model.formData)
+            Html.map GotFormMsg (Form.view model.formData)
 
         _ ->
             p [] [ text "Only logged in users can input data." ]
@@ -290,37 +270,6 @@ scheduledTaskList remoteData =
 
 
 -- HELPERS
-
-
-submitForm : Model -> ( Model, Cmd Msg )
-submitForm model =
-    let
-        ( subModel, subCmd ) =
-            Form.submit model.formData
-    in
-    ( { model | formData = subModel }
-    , Cmd.batch
-        [ subCmd
-        , focusMessageInput
-        ]
-    )
-
-
-
--- UI
-
-
-bodyInputId : String
-bodyInputId =
-    "body-input"
-
-
-focusMessageInput : Cmd Msg
-focusMessageInput =
-    Task.attempt Focus (Dom.focus bodyInputId)
-
-
-
 -- LOGGING
 
 
@@ -346,7 +295,10 @@ consoleLog log =
 deleteScheduledTaskById : Model -> TaskId -> ( Model, Cmd Msg )
 deleteScheduledTaskById model id =
     ( model
-    , Cmd.map ConsoleLog (Api.deleteTask id)
+    , Cmd.batch
+        [ Cmd.map ConsoleLog (Api.deleteTask id)
+        , Cmd.none
+        ]
     )
 
 
@@ -371,9 +323,24 @@ signOut model =
 
 updateSession : Model -> Session -> ( Model, Cmd Msg )
 updateSession model session =
-    ( { model | session = session }, focusMessageInput )
+    ( { model | session = session }
+    , Cmd.none
+    )
 
 
 toSession : Model -> Session
 toSession model =
     model.session
+
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.batch
+        [ Session.changes GotSession (toSession model)
+        , Sub.map GotApiData Api.subscription
+        , Sub.map GotFormMsg Form.subscription
+        ]

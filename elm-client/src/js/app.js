@@ -60,7 +60,6 @@ const SignIn = "SignIn";
 const SignOut = "SignOut";
 
 app.ports.dataFromElm.subscribe(({ tag, payload }) => {
-  console.log(tag, payload);
   switch (tag) {
     case ConsoleError:
       console.error(payload);
@@ -74,8 +73,8 @@ app.ports.dataFromElm.subscribe(({ tag, payload }) => {
     case DeleteTask:
       deleteTask(payload)
         .then(() => {
-          console.log("Firestore document deleted with id:", id);
-          dataToElm(GotFirebaseSuccess, id);
+          console.log("Firestore document deleted.");
+          dataToElm(GotFirebaseSuccess, DeleteTask);
         })
         .catch(error => {
           console.error("Error deleting Firestore document:", error);
@@ -118,7 +117,6 @@ app.ports.dataFromElm.subscribe(({ tag, payload }) => {
         });
       break;
     case SendGeneralNotification:
-      console.log("SendGeneralNotification:", payload);
       sendNotification({
         localeString: payload.localeString,
         body: payload.body
@@ -133,7 +131,6 @@ app.ports.dataFromElm.subscribe(({ tag, payload }) => {
         });
       break;
     case SendBoardNotification:
-      console.log("SendBoardNotification:", payload);
       sendBoardNotification({
         localeString: payload.localeString,
         body: payload.body
