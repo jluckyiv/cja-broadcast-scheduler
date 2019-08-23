@@ -137,6 +137,12 @@ update msg model =
 updateWithApiData : Model -> Api.DataToElm -> ( Model, Cmd Msg )
 updateWithApiData model apiData =
     case apiData of
+        Api.GotFirebaseError errors ->
+            ( model, Cmd.none )
+
+        Api.GotFirebaseSuccess id ->
+            ( model, Cmd.none )
+
         Api.GotAdmins admins ->
             let
                 isAuthorized =

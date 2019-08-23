@@ -18,6 +18,7 @@ port module Api exposing
 
 import Admin exposing (Admin)
 import Api.Payload as Payload exposing (Payload)
+import FirebaseError exposing (FirebaseError)
 import Json.Decode as Decode
 import Json.Encode as Encode exposing (Value)
 import RemoteData exposing (RemoteData)
@@ -58,6 +59,8 @@ type DataToElm
     | GotCompleteTasks (RemoteList ScheduledTask)
     | GotScheduledTasks (RemoteList ScheduledTask)
     | GotAdmins (RemoteList Admin)
+    | GotFirebaseError (Maybe FirebaseError)
+    | GotFirebaseSuccess (Maybe String)
 
 
 type DataFromElm
@@ -140,6 +143,11 @@ decodeGenericData { tag, payload } =
         "GotScheduled" ->
             GotScheduledTasks (remoteListFromPayload ScheduledTask.decoder)
 
+        "GotFirebaseError" ->
+            GotFirebaseError (payload |> Decode.decodeValue FirebaseError.decoder |> Result.toMaybe)
+
+        "GotFirebaseSuccess" ->
+            GotFirebaseSuccess (payload |> Decode.decodeValue Decode.string |> Result.toMaybe)
         _ ->
             Unrecognized
 

@@ -48,6 +48,8 @@ const DeleteTask = "DeleteTask";
 const GetAdmins = "GetAdmins";
 const GotAdmins = "GotAdmins";
 const GotComplete = "GotComplete";
+const GotFirebaseError = "GotFirebaseError";
+const GotFirebaseSuccess = "GotFirebaseSuccess";
 const GotScheduled = "GotScheduled";
 const Pending = "Pending";
 const SendBoardNotification = "SendBoardNotification";
@@ -62,12 +64,23 @@ app.ports.dataFromElm.subscribe(({ tag, payload }) => {
   switch (tag) {
     case ConsoleError:
       console.error(payload);
+      break;
     case ConsoleInfo:
       console.info(payload);
+      break;
     case ConsoleLog:
       console.log(payload);
+      break;
     case DeleteTask:
-      deleteTask(payload);
+      deleteTask(payload)
+        .then(() => {
+          console.log("Firestore document deleted with id:", id);
+          dataToElm(GotFirebaseSuccess, id);
+        })
+        .catch(error => {
+          console.error("Error deleting Firestore document:", error);
+          dataToElm(GotFirebaseError, error);
+        });
       break;
     case GetAdmins:
       getAdmins()
@@ -79,28 +92,60 @@ app.ports.dataFromElm.subscribe(({ tag, payload }) => {
         localeString: payload.localeString,
         phoneNumber: JacksNumber,
         body: payload.body
-      });
+      })
+        .then(docRef => {
+          console.log("Firestore document written with id:", docRef.id);
+          dataToElm(GotFirebaseSuccess, docRef.id);
+        })
+        .catch(error => {
+          console.error("Error adding Firestore document:", error);
+          dataToElm(GotFirebaseError, error);
+        });
       break;
     case SendNicoleMessage:
       sendMessage({
         localeString: payload.localeString,
         phoneNumber: NicolesNumber,
         body: payload.body
-      });
+      })
+        .then(docRef => {
+          console.log("Firestore document written with id:", docRef.id);
+          dataToElm(GotFirebaseSuccess, docRef.id);
+        })
+        .catch(error => {
+          console.error("Error adding Firestore document:", error);
+          dataToElm(GotFirebaseError, error);
+        });
       break;
     case SendGeneralNotification:
       console.log("SendGeneralNotification:", payload);
       sendNotification({
         localeString: payload.localeString,
         body: payload.body
-      });
+      })
+        .then(docRef => {
+          console.log("Firestore document written with id:", docRef.id);
+          dataToElm(GotFirebaseSuccess, docRef.id);
+        })
+        .catch(error => {
+          console.error("Error adding Firestore document:", error);
+          dataToElm(GotFirebaseError, error);
+        });
       break;
     case SendBoardNotification:
       console.log("SendBoardNotification:", payload);
       sendBoardNotification({
         localeString: payload.localeString,
         body: payload.body
-      });
+      })
+        .then(docRef => {
+          console.log("Firestore document written with id:", docRef.id);
+          dataToElm(GotFirebaseSuccess, docRef.id);
+        })
+        .catch(error => {
+          console.error("Error adding Firestore document:", error);
+          dataToElm(GotFirebaseError, error);
+        });
       break;
     case SignIn:
       setSignInResponseStatus(Pending);

@@ -4,9 +4,9 @@ import DateTime
 import Expect exposing (Expectation)
 import Fuzz exposing (Fuzzer, int, list, string)
 import Json.Decode as Decode
+import ScheduledTask exposing (ScheduledTask)
 import ScheduledTask.MessageOptions as MessageOptions exposing (MessageOptions)
 import ScheduledTask.NotificationOptions as NotificationOptions exposing (NotificationOptions)
-import ScheduledTask exposing (ScheduledTask)
 import Test exposing (..)
 
 
@@ -96,4 +96,28 @@ suite =
                     |> DateTime.toLocaleString
                     |> Expect.equal
                         "8/13/2019, 11:52:00 PM"
+        , test "Date is valid with different separators" <|
+            \_ ->
+                [ "8/13/2019" , "8-13-2019" , "8.13.2019" , "8/13/2019", "8/13/19" ]
+                    |> List.map DateTime.toValidDate
+                    |> Expect.equal
+                        [ Ok "8/13/2019" , Ok "8/13/2019" , Ok "8/13/2019" , Ok "8/13/2019", Ok "8/13/2019" ]
+--        , test "Date errors" <|
+--            \_ ->
+--                [ "13/13/2019" , "9/31/2019" , "8-13-2018" ]
+--                    |> List.map DateTime.toValidDate
+--                    |> Expect.equal
+--                        [Err "Invalid month", Err "Invalid day", Err "Invalid year"]
+--        , test "Time is valid with different separators" <|
+--            \_ ->
+--                [ "2359" , "23.59" , "23:59", "11:59 PM"]
+--                    |> List.map DateTime.toValidTime
+--                    |> Expect.equal
+--                        [ Ok "11:59 PM" , Ok "11:59 PM" , Ok "11:59 PM" , Ok "11:59 PM" ]
+--        , test "Time errors" <|
+--            \_ ->
+--                [ "2501" , "23.61" ,  "11:59 SM", "13:59 AM"]
+--                    |> List.map DateTime.toValidTime
+--                    |> Expect.equal
+--                        [ Err "Invalid hour" , Ok "Invalid minutes" , Ok "Must be AM or PM" , Ok "13:59 is not AM" ]
         ]
