@@ -44,56 +44,13 @@ type Worker
 
 init : String -> Model
 init localeString =
-    let
-        newModel =
-            { worker = SendBoardNotification
-            , body = ""
-            , time = ""
-            , date = localeString |> DateTime.fromLocaleString |> DateTime.toDateString
-            , errors = []
-            }
-    in
-    case validateModel newModel of
-        Ok _ ->
-             { newModel | errors = [] }
-
-        Err errors ->
-             { newModel | errors = errors }
-
-
-modelValidator : Validator FormError Model
-modelValidator =
-    Validate.all
-        [ Validate.ifBlank .body ( Body, "Please enter a message" )
-        , Validate.firstError
-            [ Validate.ifBlank .time ( Time, "Please enter a time" )
-            , Validate.ifTrue (\model -> isInvalidTime model.time) ( Time, "Please format time as HH:mm AM/PM" )
-            ]
-        , Validate.firstError
-            [ Validate.ifBlank .date ( Date, "Please enter a date" )
-            , Validate.ifTrue (\model -> isInvalidDate model.date) ( Date, "Please format date as M/D/YY" )
-            ]
-        ]
-
-
-isInvalidTime : String -> Bool
-isInvalidTime string =
-    case Time.fromLocaleString string of
-        Err _ ->
-            True
-
-        Ok _ ->
-            False
-
-
-isInvalidDate : String -> Bool
-isInvalidDate string =
-    case Date.fromLocaleString string of
-        Err _ ->
-            True
-
-        Ok _ ->
-            False
+    checkErrors
+        { worker = SendBoardNotification
+        , body = ""
+        , time = ""
+        , date = localeString |> DateTime.fromLocaleString |> DateTime.toDateString
+        , errors = []
+        }
 
 
 
@@ -141,11 +98,6 @@ submit model =
             ( { model | errors = errors }, Cmd.none )
 
 
-validateModel : Model -> Result (List FormError) (Valid Model)
-validateModel model =
-    Validate.validate modelValidator model
-
-
 submitValid : Valid Model -> ( Model, Cmd msg )
 submitValid validModel =
     let
@@ -170,44 +122,17 @@ updateWorker model worker =
 
 updateBody : Model -> String -> ( Model, Cmd Msg )
 updateBody model string =
-    let
-        newModel =
-            { model | body = string }
-    in
-    case validateModel newModel of
-        Ok _ ->
-            ( { newModel | errors = [] }, Cmd.none )
-
-        Err errors ->
-            ( { newModel | errors = errors }, Cmd.none )
+    ( checkErrors { model | body = string }, Cmd.none )
 
 
 updateDate : Model -> String -> ( Model, Cmd Msg )
 updateDate model string =
-    let
-        newModel =
-            { model | date = string }
-    in
-    case validateModel newModel of
-        Ok _ ->
-            ( { newModel | errors = [] }, Cmd.none )
-
-        Err errors ->
-            ( { newModel | errors = errors }, Cmd.none )
+    ( checkErrors { model | date = string }, Cmd.none )
 
 
 updateTime : Model -> String -> ( Model, Cmd Msg )
 updateTime model string =
-    let
-        newModel =
-            { model | time = string }
-    in
-    case validateModel newModel of
-        Ok _ ->
-            ( { newModel | errors = [] }, Cmd.none )
-
-        Err errors ->
-            ( { newModel | errors = errors }, Cmd.none )
+    ( checkErrors { model | time = string }, Cmd.none )
 
 
 workerToCmd : Worker -> (Payload -> Cmd msg)
@@ -231,6 +156,60 @@ workerToCmd worker =
 
 
 
+-- VALIDATION
+
+
+checkErrors : Model -> Model
+checkErrors model =
+    case validateModel model of
+        Ok _ ->
+            { model | errors = [] }
+
+        Err errors ->
+            { model | errors = errors }
+
+
+validateModel : Model -> Result (List FormError) (Valid Model)
+validateModel model =
+    Validate.validate modelValidator model
+
+
+modelValidator : Validator FormError Model
+modelValidator =
+    Validate.all
+        [ Validate.ifBlank .body ( Body, "Please enter a message" )
+        , Validate.firstError
+            [ Validate.ifBlank .time ( Time, "Please enter a time" )
+            , Validate.ifTrue (\model -> isInvalidTime model.time) ( Time, "Please format time as HH:mm AM/PM" )
+            ]
+        , Validate.firstError
+            [ Validate.ifBlank .date ( Date, "Please enter a date" )
+            , Validate.ifTrue (\model -> isInvalidDate model.date) ( Date, "Please format date as M/D/YY" )
+            ]
+        ]
+
+
+isInvalidTime : String -> Bool
+isInvalidTime string =
+    case Time.fromLocaleString string of
+        Err _ ->
+            True
+
+        Ok _ ->
+            False
+
+
+isInvalidDate : String -> Bool
+isInvalidDate string =
+    case Date.fromLocaleString string of
+        Err _ ->
+            True
+
+        Ok _ ->
+            False
+
+
+
 -- VIEW
 
 
@@ -238,13 +217,13 @@ view : String -> Model -> Html Msg
 view id_ model =
     let
         ( onSubmit_, submitButton ) =
-            case validateModel model of
-                Ok _ ->
+            case model.errors of
+                [] ->
                     ( SubmittedForm
                     , button [ id "submit-button", class Bu.button, class Bu.isInfo ] [ text "Send" ]
                     )
 
-                Err _ ->
+                _ ->
                     ( Ignored
                     , button [ id "submit-button", class Bu.button, class Bu.isDisabled, attribute "disabled" "" ] [ text "Send" ]
                     )
@@ -252,8 +231,8 @@ view id_ model =
     form [ id "input-form", onSubmit onSubmit_ ]
         [ workerMenu model
         , inputField model Body id_ "Message" "Your message here" UpdatedMessage
-        , inputField model Time "time-input" "Time" "13:15 or 1:15 PM" UpdatedTime
-        , inputField model Date "date-input" "Date" "01/01/2001" UpdatedDate
+        , inputField model Time "time-input" "Time" "E.g., 1:15 PM" UpdatedTime
+        , inputField model Date "date-input" "Date" "1/1/19" UpdatedDate
         , submitButton
         ]
 

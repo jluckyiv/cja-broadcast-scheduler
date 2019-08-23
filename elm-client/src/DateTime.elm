@@ -15,6 +15,7 @@ import Html exposing (Html)
 import Json.Decode as Decode exposing (Decoder)
 import Parser exposing (Parser)
 import DateTime.Date as Date exposing (Date)
+import DateTime.Time as Time exposing (Time)
 
 
 type DateTime
@@ -75,6 +76,12 @@ toValidDate string =
     result
 
 
-toValidTime : String -> Result String String
+toValidTime : String -> Result (List Parser.DeadEnd) String
 toValidTime string =
-    Ok string
+    let
+        result =
+            string
+                |> Time.fromLocaleString
+                |> Result.map Time.toLocaleString
+    in
+    result

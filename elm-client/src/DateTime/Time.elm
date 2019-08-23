@@ -136,18 +136,36 @@ minuteParser =
 
 cycleParser : Parser String
 cycleParser =
-    Parser.getChompedString <|
+    let
+        checkCycle : String -> Parser String
+        checkCycle string =
+            case String.toUpper string of
+                "AM" ->
+                    Parser.succeed string
+
+                "PM" ->
+                    Parser.succeed string
+
+                _ ->
+                    Parser.problem "Must be AM or PM"
+    in
+    (Parser.getChompedString <|
         Parser.succeed identity
             |= Parser.chompWhile Char.isAlpha
+    )
+        |> Parser.andThen checkCycle
 
 
 time12Parser : Parser Time
 time12Parser =
     Parser.succeed from12Hour
+        |. whitespace
         |= hourParser
+        |. whitespace
         |= minuteParser
         |. whitespace
         |= cycleParser
+        |. whitespace
         |. Parser.end
 
 
@@ -157,18 +175,18 @@ hourAndCycle hour_ cycle_ =
         hour =
             clamp 0 23 hour_
 
-        _ =
-            Debug.log "cycle_" cycle_
+        cycle =
+            cycle_ |> String.toUpper |> String.left 1
     in
     if hour > 12 then
         ( hourFromInt (hour - 12), PM )
 
     else
-        case cycle_ of
-            "AM" ->
+        case cycle of
+            "A" ->
                 ( hourFromInt hour, AM )
 
-            "PM" ->
+            "P" ->
                 ( hourFromInt hour, PM )
 
             _ ->
