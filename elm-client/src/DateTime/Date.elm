@@ -5,6 +5,7 @@ module DateTime.Date exposing
     , toLocaleString
     )
 
+import DateTime.Parser as Parser
 import Parser exposing ((|.), (|=), Parser)
 
 
@@ -117,6 +118,9 @@ monthToInt month =
 dayFromInt : { month : Month, day : Int, year : Int } -> Day
 dayFromInt { month, day, year } =
     let
+        min =
+            1
+
         max =
             case ( month, isLeapYear year ) of
                 ( Feb, False ) ->
@@ -140,7 +144,7 @@ dayFromInt { month, day, year } =
                 ( _, _ ) ->
                     31
     in
-    clamp 1 max day |> Day
+    clamp min max day |> Day
 
 
 dayToInt : Day -> Int
@@ -157,77 +161,37 @@ isLeapYear year =
         False
 
 
-nonDigit : Parser ()
-nonDigit =
-    Parser.chompWhile (\c -> not (Char.isDigit c))
-
-
-digitParser : Parser Int
-digitParser =
-    (Parser.succeed identity
-        |. nonDigit
-        |= (Parser.getChompedString <| Parser.chompWhile Char.isDigit)
-        |. nonDigit
-    )
-        |> Parser.map String.toInt
-        |> Parser.andThen
-            (\maybe ->
-                case maybe of
-                    Just n ->
-                        Parser.succeed n
-
-                    Nothing ->
-                        Parser.problem "Invalid digits"
-            )
-
-
 monthParser : Parser Int
 monthParser =
-    let
-        checkDigits : Int -> Parser Int
-        checkDigits int =
-            if int > 0 && int < 13 then
-                Parser.succeed int
-
-            else
-                Parser.problem "Month must be 12 or less"
-    in
-    digitParser
-    |> Parser.andThen checkDigits
+    Parser.digit
+        |> Parser.andThen (Parser.inRange 1 12)
 
 
 dayParser : Parser Int
 dayParser =
-    let
-        checkDigits : Int -> Parser Int
-        checkDigits int =
-            if int > 0 && int < 32 then
-                Parser.succeed int
-
-            else
-                Parser.problem "Day must be 31 or less"
-    in
-    digitParser
-    |> Parser.andThen checkDigits
+    Parser.digit
+        |> Parser.andThen (Parser.inRange 1 31)
 
 
 yearParser : Parser Int
 yearParser =
     let
-        checkDigits : Int -> Parser Int
-        checkDigits digits =
+        checkLength : Int -> Parser Int
+        checkLength int =
             let
-                string =
-                    String.fromInt digits
+                length =
+                    int
+                    |> String.fromInt
+                    |> String.length
             in
-            if String.length string == 2 || String.length string == 4 then
-                Parser.succeed digits
+            if length == 2 || length == 4 then
+                Parser.succeed int
 
             else
                 Parser.problem "Year must be two or four digits"
     in
-    digitParser
-        |> Parser.andThen checkDigits
+    Parser.digit
+        |> Parser.andThen checkLength
 
 
 dateParser : Parser Date

@@ -5,6 +5,7 @@ module DateTime.Time exposing
     , toLocaleString
     )
 
+import DateTime.Parser as Parser
 import Parser exposing ((|.), (|=), Parser)
 
 
@@ -28,11 +29,6 @@ type Cycle
     | PM
 
 
-hourFromInt : Int -> Hour
-hourFromInt int =
-    clamp 0 23 int |> Hour
-
-
 hourToInt : Hour -> Int
 hourToInt (Hour int) =
     int
@@ -41,11 +37,6 @@ hourToInt (Hour int) =
 hourToString : Hour -> String
 hourToString (Hour int) =
     String.fromInt int
-
-
-minuteFromInt : Int -> Minute
-minuteFromInt int =
-    clamp 0 59 int |> Minute
 
 
 minuteToInt : Minute -> Int
@@ -76,154 +67,6 @@ cycleToString cycle =
             "PM"
 
 
-nonDigit : Parser ()
-nonDigit =
-    Parser.chompWhile (\c -> not (Char.isDigit c))
-
-
-whitespace : Parser ()
-whitespace =
-    Parser.chompWhile (\c -> c == ' ')
-
-
-digitParser : Parser Int
-digitParser =
-    (Parser.succeed identity
-        |. nonDigit
-        |= (Parser.getChompedString <| Parser.chompWhile Char.isDigit)
-    )
-        |> Parser.map String.toInt
-        |> Parser.andThen
-            (\maybe ->
-                case maybe of
-                    Just n ->
-                        Parser.succeed n
-
-                    Nothing ->
-                        Parser.problem "Invalid digits"
-            )
-
-
-hourParser : Parser Int
-hourParser =
-    let
-        checkDigits : Int -> Parser Int
-        checkDigits int =
-            if int >= 0 && int <= 23 then
-                Parser.succeed int
-
-            else
-                Parser.problem "Hour must be between 0 and 23"
-    in
-    digitParser
-        |> Parser.andThen checkDigits
-
-
-minuteParser : Parser Int
-minuteParser =
-    let
-        checkDigits : Int -> Parser Int
-        checkDigits int =
-            if int >= 0 && int <= 59 then
-                Parser.succeed int
-
-            else
-                Parser.problem "Hour must be between 0 and 23"
-    in
-    digitParser
-        |> Parser.andThen checkDigits
-
-
-cycleParser : Parser String
-cycleParser =
-    let
-        checkCycle : String -> Parser String
-        checkCycle string =
-            case String.toUpper string of
-                "AM" ->
-                    Parser.succeed string
-
-                "PM" ->
-                    Parser.succeed string
-
-                _ ->
-                    Parser.problem "Must be AM or PM"
-    in
-    (Parser.getChompedString <|
-        Parser.succeed identity
-            |= Parser.chompWhile Char.isAlpha
-    )
-        |> Parser.andThen checkCycle
-
-
-time12Parser : Parser Time
-time12Parser =
-    Parser.succeed from12Hour
-        |. whitespace
-        |= hourParser
-        |. whitespace
-        |= minuteParser
-        |. whitespace
-        |= cycleParser
-        |. whitespace
-        |. Parser.end
-
-
-hourAndCycle : Int -> String -> ( Hour, Cycle )
-hourAndCycle hour_ cycle_ =
-    let
-        hour =
-            clamp 0 23 hour_
-
-        cycle =
-            cycle_ |> String.toUpper |> String.left 1
-    in
-    if hour > 12 then
-        ( hourFromInt (hour - 12), PM )
-
-    else
-        case cycle of
-            "A" ->
-                ( hourFromInt hour, AM )
-
-            "P" ->
-                ( hourFromInt hour, PM )
-
-            _ ->
-                if hour < 8 then
-                    ( hourFromInt hour, PM )
-
-                else if hour == 12 then
-                    ( hourFromInt hour, PM )
-
-                else
-                    ( hourFromInt hour, AM )
-
-
-from12Hour : Int -> Int -> String -> Time
-from12Hour hour_ minute_ cycle_ =
-    let
-        minute =
-            minuteFromInt minute_
-
-        ( hour, cycle ) =
-            hourAndCycle hour_ cycle_
-    in
-    Time hour minute cycle
-
-
-fromLocaleString : String -> Result (List Parser.DeadEnd) Time
-fromLocaleString =
-    fromString
-
-
-fromString : String -> Result (List Parser.DeadEnd) Time
-fromString string =
-    string
-        |> String.replace "." ":"
-        |> Parser.run time12Parser
-
-
 toLocaleString : Time -> String
 toLocaleString time =
     let
@@ -237,3 +80,95 @@ toLocaleString time =
             cycleToString time.cycle
     in
     hour ++ ":" ++ minute ++ " " ++ cycle
+
+
+fromLocaleString : String -> Result (List Parser.DeadEnd) Time
+fromLocaleString =
+    fromString
+
+
+fromString : String -> Result (List Parser.DeadEnd) Time
+fromString string =
+    string
+        |> String.replace "." ":"
+        |> Parser.run timeParser
+
+
+timeParser : Parser Time
+timeParser =
+    Parser.succeed fromHourMinuteCycle
+        |. Parser.whitespace
+        |= hourParser
+        |. Parser.whitespace
+        |= minuteParser
+        |. Parser.whitespace
+        |= cycleParser
+        |. Parser.whitespace
+        |. Parser.end
+
+
+hourParser : Parser Int
+hourParser =
+    Parser.digit
+        |> Parser.andThen (Parser.inRange 0 23)
+
+
+minuteParser : Parser Int
+minuteParser =
+    Parser.digit
+        |> Parser.andThen (Parser.inRange 0 59)
+
+
+cycleParser : Parser String
+cycleParser =
+    Parser.alpha
+        |> Parser.map String.toUpper
+        |> Parser.andThen (Parser.isMember [ "AM", "PM" ])
+
+
+minuteFromInt : Int -> Minute
+minuteFromInt int =
+    clamp 0 59 int |> Minute
+
+
+fromHourMinuteCycle : Int -> Int -> String -> Time
+fromHourMinuteCycle hour_ minute_ cycle_ =
+    let
+        minute =
+            minuteFromInt minute_
+
+        ( hour, cycle ) =
+            toHourAndCycle hour_ cycle_
+    in
+    Time hour minute cycle
+
+
+toHourAndCycle : Int -> String -> ( Hour, Cycle )
+toHourAndCycle hour_ cycle_ =
+    let
+        hour =
+            clamp 0 23 hour_
+
+        cycle =
+            cycle_ |> String.toUpper |> String.left 1
+    in
+    if hour > 12 then
+        ( Hour (hour - 12), PM )
+
+    else
+        case cycle of
+            "A" ->
+                ( Hour hour, AM )
+
+            "P" ->
+                ( Hour hour, PM )
+
+            _ ->
+                if hour < 8 then
+                    ( Hour hour, PM )
+
+                else if hour == 12 then
+                    ( Hour hour, PM )
+
+                else
+                    ( Hour hour, AM )
