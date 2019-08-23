@@ -110,7 +110,7 @@ submitValid validModel =
         apiCmd =
             workerToCmd model.worker (Payload model.body localeString)
     in
-    ( { model | body = "", time = "" }
+    ( checkErrors { model | body = "", time = "" }
     , apiCmd
     )
 
