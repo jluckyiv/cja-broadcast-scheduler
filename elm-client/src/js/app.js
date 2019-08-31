@@ -1,183 +1,146 @@
-import {
-  JacksNumber,
-  NicolesNumber,
-  auth,
-  completeTasksQuery,
-  deleteTask,
-  getAdmins,
-  scheduledTasksQuery,
-  sendBoardNotification,
-  sendMessage,
-  sendNotification,
-  signIn,
-  signOut
-} from "./firebase";
-import { Elm } from "../Main.elm";
+import { Api } from './api';
+import { Elm } from '../Main.elm';
 
-// Setup and helpers
-const StorageKey = "AwaitingSignInResponse";
-const getSignInResponseStatus = () => localStorage.getItem(StorageKey);
-const setSignInResponseStatus = value =>
-  localStorage.setItem(StorageKey, value);
+// Setup
+const logSuccess = message => dataToElm(tag.GotFirebaseSuccess, message);
+const logError = message => dataToElm(tag.GotFirebaseError, message);
 
-const formatDoc = doc => formatPayload(doc.data(), doc.id);
-const formatPayload = (task, id) => ({
-  id,
-  options: task.options,
-  performAt: task.performAt.toDate().toLocaleString("en-US"),
-  status: task.status,
-  worker: task.worker
-});
+const StorageKey = 'AwaitingSignInResponse';
+const setSignInResponseStatus = value => localStorage.setItem(StorageKey, value);
 
 // Elm app
 const flags = {
-  status: getSignInResponseStatus(),
-  localeString: new Date().toLocaleString("en-US")
+  status: localStorage.getItem(StorageKey),
+  localeString: new Date().toLocaleString('en-US'),
 };
 
 const app = Elm.Main.init({
-  node: document.getElementById("app"),
-  flags
+  node: document.getElementById('app'),
+  flags,
 });
 
 // Ports
-const ConsoleError = "ConsoleError";
-const ConsoleInfo = "ConsoleInfo";
-const ConsoleLog = "ConsoleLog";
-const DeleteTask = "DeleteTask";
-const GetAdmins = "GetAdmins";
-const GotAdmins = "GotAdmins";
-const GotComplete = "GotComplete";
-const GotFirebaseError = "GotFirebaseError";
-const GotFirebaseSuccess = "GotFirebaseSuccess";
-const GotScheduled = "GotScheduled";
-const Pending = "Pending";
-const SendBoardNotification = "SendBoardNotification";
-const SendGeneralNotification = "SendGeneralNotification";
-const SendJackMessage = "SendJackMessage";
-const SendNicoleMessage = "SendNicoleMessage";
-const SignIn = "SignIn";
-const SignOut = "SignOut";
-
-app.ports.dataFromElm.subscribe(({ tag, payload }) => {
-  switch (tag) {
-    case ConsoleError:
-      console.error(payload);
-      break;
-    case ConsoleInfo:
-      console.info(payload);
-      break;
-    case ConsoleLog:
-      console.log(payload);
-      break;
-    case DeleteTask:
-      deleteTask(payload)
-        .then(() => {
-          console.log("Firestore document deleted.");
-          dataToElm(GotFirebaseSuccess, DeleteTask);
-        })
-        .catch(error => {
-          console.error("Error deleting Firestore document:", error);
-          dataToElm(GotFirebaseError, error);
-        });
-      break;
-    case GetAdmins:
-      getAdmins()
-        .then(data => dataToElm(GotAdmins, data.docs.map(doc => doc.id)))
-        .catch(err => console.error(err));
-      break;
-    case SendJackMessage:
-      sendMessage({
-        localeString: payload.localeString,
-        phoneNumber: JacksNumber,
-        body: payload.body
-      })
-        .then(docRef => {
-          console.log("Firestore document written with id:", docRef.id);
-          dataToElm(GotFirebaseSuccess, docRef.id);
-        })
-        .catch(error => {
-          console.error("Error adding Firestore document:", error);
-          dataToElm(GotFirebaseError, error);
-        });
-      break;
-    case SendNicoleMessage:
-      sendMessage({
-        localeString: payload.localeString,
-        phoneNumber: NicolesNumber,
-        body: payload.body
-      })
-        .then(docRef => {
-          console.log("Firestore document written with id:", docRef.id);
-          dataToElm(GotFirebaseSuccess, docRef.id);
-        })
-        .catch(error => {
-          console.error("Error adding Firestore document:", error);
-          dataToElm(GotFirebaseError, error);
-        });
-      break;
-    case SendGeneralNotification:
-      sendNotification({
-        localeString: payload.localeString,
-        body: payload.body
-      })
-        .then(docRef => {
-          console.log("Firestore document written with id:", docRef.id);
-          dataToElm(GotFirebaseSuccess, docRef.id);
-        })
-        .catch(error => {
-          console.error("Error adding Firestore document:", error);
-          dataToElm(GotFirebaseError, error);
-        });
-      break;
-    case SendBoardNotification:
-      sendBoardNotification({
-        localeString: payload.localeString,
-        body: payload.body
-      })
-        .then(docRef => {
-          console.log("Firestore document written with id:", docRef.id);
-          dataToElm(GotFirebaseSuccess, docRef.id);
-        })
-        .catch(error => {
-          console.error("Error adding Firestore document:", error);
-          dataToElm(GotFirebaseError, error);
-        });
-      break;
-    case SignIn:
-      setSignInResponseStatus(Pending);
-      signIn();
-      break;
-    case SignOut:
-      signOut();
-      break;
-    default:
-      console.error(`Unrecognized tag: ${tag}, with payload:`, payload);
-      break;
-  }
-});
-
 const dataToElm = (tag, payload) => {
   app.ports.dataToElm.send({ tag, payload });
 };
 
+app.ports.dataFromElm.subscribe(({ tag, payload }) => {
+  const fun = api[tag];
+  if (fun && typeof fun === 'function') {
+    fun(payload);
+  } else {
+    logError(`Unrecognized tag: ${tag}, with payload:`, payload);
+  }
+});
+
+// Api
+const tag = {
+  GotAdmins: 'GotAdmins',
+  GotComplete: 'GotComplete',
+  GotFirebaseError: 'GotFirebaseError',
+  GotFirebaseSuccess: 'GotFirebaseSuccess',
+  GotScheduled: 'GotScheduled',
+  Pending: 'Pending',
+};
+
+const api = {
+  ConsoleError: payload => console.error(payload),
+  ConsoleInfo: payload => console.info(payload),
+  ConsoleLog: payload => console.log(payload),
+  DeleteTask: (payload) => {
+    Api.deleteTask(payload)
+      .then(() => {
+        logSuccess(`Firestore document deleted: ${payload}.`);
+      })
+      .catch((error) => {
+        logError(`Error deleting Firestore document ${payload} with error ${error}.`);
+      });
+  },
+  GetAdmins: () => {
+    Api.getAdmins()
+      .then(data => dataToElm(tag.GotAdmins, data.docs.map(doc => doc.id)))
+      .catch((error) => {
+        logError(`Error fetching admins from Firestore: ${error}.`);
+      });
+  },
+  SendBoardNotification: (payload) => {
+    Api.sendBoardNotification({
+      localeString: payload.localeString,
+      body: payload.body,
+    })
+      .then((docRef) => {
+        logSuccess(`Firestore document written: ${docRef.id}.`);
+      })
+      .catch((error) => {
+        logError(`Error adding Firestore document: ${error}.`);
+      });
+  },
+  SendGeneralNotification: (payload) => {
+    Api.sendNotification({
+      localeString: payload.localeString,
+      body: payload.body,
+    })
+      .then((docRef) => {
+        logSuccess(`Firestore document written: ${docRef.id}.`);
+      })
+      .catch((error) => {
+        logError(`Error adding Firestore document: ${error}.`);
+      });
+  },
+  SendJackMessage: (payload) => {
+    Api.sendMessage({
+      localeString: payload.localeString,
+      phoneNumber: Api.JacksNumber,
+      body: payload.body,
+    })
+      .then((docRef) => {
+        logSuccess(`Firestore document written: ${docRef.id}.`);
+      })
+      .catch((error) => {
+        logError(`Error adding Firestore document: ${error}.`);
+      });
+  },
+  SendNicoleMessage: (payload) => {
+    sendMessage({
+      localeString: payload.localeString,
+      phoneNumber: Api.NicolesNumber,
+      body: payload.body,
+    })
+      .then((docRef) => {
+        logSuccess(`Firestore document written: ${docRef.id}.`);
+      })
+      .catch((error) => {
+        logError(`Error adding Firestore document: ${error}.`);
+      });
+  },
+  SignIn: () => {
+    setSignInResponseStatus(tag.Pending);
+    Api.signIn();
+  },
+  SignOut: () => {
+    Api.signOut();
+  },
+};
+
+// Listeners
 let unsubscribeScheduled;
 let unsubscribeComplete;
-auth.onAuthStateChanged(user => {
+
+Api.auth.onAuthStateChanged((user) => {
   setSignInResponseStatus(null);
   if (user) {
-    unsubscribeScheduled = scheduledTasksQuery().onSnapshot(
-      data => {
-        dataToElm(GotScheduled, data.docs.map(doc => formatDoc(doc)));
+    unsubscribeScheduled = Api.scheduledTasksQuery().onSnapshot(
+      (data) => {
+        dataToElm(tag.GotScheduled, data.docs.map(doc => formatDoc(doc)));
       },
-      error => console.error("Scheduled snapshot error", error)
+      error => console.error('Scheduled snapshot error', error),
     );
 
-    unsubscribeComplete = completeTasksQuery().onSnapshot(
-      data => {
-        dataToElm(GotComplete, data.docs.map(doc => formatDoc(doc)));
+    unsubscribeComplete = Api.completeTasksQuery().onSnapshot(
+      (data) => {
+        dataToElm(tag.GotComplete, data.docs.map(doc => formatDoc(doc)));
       },
-      error => console.error("Complete snapshot error", error)
+      error => console.error('Complete snapshot error', error),
     );
   } else {
     if (unsubscribeComplete) {
@@ -188,4 +151,14 @@ auth.onAuthStateChanged(user => {
     }
   }
   app.ports.authStateChanged.send(user);
+});
+
+// Helpers
+const formatDoc = doc => formatPayload(doc.data(), doc.id);
+const formatPayload = (task, id) => ({
+  id,
+  options: task.options,
+  performAt: task.performAt.toDate().toLocaleString('en-US'),
+  status: task.status,
+  worker: task.worker,
 });
