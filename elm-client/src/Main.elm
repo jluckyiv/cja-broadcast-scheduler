@@ -13,6 +13,7 @@ import RemoteData exposing (RemoteData(..))
 import ScheduledTask exposing (ScheduledTask)
 import ScheduledTask.TaskId exposing (TaskId)
 import Session exposing (Session)
+import Task
 import User exposing (User)
 
 
@@ -129,11 +130,21 @@ update msg model =
 updateWithApiData : Model -> Api.DataToElm -> ( Model, Cmd Msg )
 updateWithApiData model apiData =
     case apiData of
-        Api.GotFirebaseError errors ->
-            ( model, Cmd.none )
+        Api.GotFirebaseError maybeString ->
+            case maybeString of
+                Just string ->
+                    ( model, consoleError string )
 
-        Api.GotFirebaseSuccess id ->
-            ( model, Cmd.none )
+                Nothing ->
+                    ( model, Cmd.none )
+
+        Api.GotFirebaseSuccess maybeString ->
+            case maybeString of
+                Just string ->
+                    ( model, consoleInfo string )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         Api.GotAdmins admins ->
             let

@@ -1,4 +1,4 @@
-module FirebaseError exposing (FirebaseError, decoder)
+module FirebaseError exposing (FirebaseError, decoder, toString)
 
 import Json.Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (required)
@@ -9,6 +9,11 @@ type alias FirebaseError =
     , message : String
     , code : String
     }
+
+
+toString : FirebaseError -> String
+toString firebaseError =
+    firebaseError.message
 
 
 decoder : Decoder FirebaseError
